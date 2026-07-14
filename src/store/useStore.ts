@@ -1,7 +1,9 @@
 // src/store/useStore.ts
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { type Place, mockPlaces } from "../data/mockPlaces";
+import { authApi } from "../api/auth";
+import { placesApi } from "../api/places";
+import { type Place } from "../data/mockPlaces";
 
 interface Store {
   favorites: Place[];
@@ -16,7 +18,8 @@ interface Store {
   addToRoute: (place: Place) => void;
   removeFromRoute: (id: number) => void;
   clearRoute: () => void;
-  addPlace: (place: Omit<Place, "id">) => void;
+  setPlaces: (places: Place[]) => void;
+  addPlace: (place: Omit<Place, "id">) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -27,7 +30,7 @@ export const useStore = create<Store>()(
     (set) => ({
       favorites: [],
       route: [],
-      places: mockPlaces,
+      places: [],
       isAuth: false,
       isModerator: false,
       userEmail: "",
@@ -59,14 +62,24 @@ export const useStore = create<Store>()(
 
       clearRoute: () => set({ route: [] }),
 
-      addPlace: (place) =>
-        set((state) => ({
-          places: [...state.places, { ...place, id: Date.now() }],
-        })),
+      setPlaces: (places) => set({ places }),
 
-      // Мок-авторизация с улучшенной валидацией
+      addPlace: async (place) => {
+        const createdPlace = await placesApi.createSuggestion({
+          name: place.name,
+          description: place.description ?? "",
+          category: place.category,
+          latitude: place.lat,
+          longitude: place.lng,
+          tags: [],
+        });
+
+        set((state) => ({
+          places: [...state.places, createdPlace],
+        }));
+      },
+
       login: async (email: string, password: string) => {
-        await new Promise((resolve) => setTimeout(resolve, 800));
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         if (!emailRegex.test(email)) {
           throw new Error("Неверный формат почты");
@@ -74,18 +87,25 @@ export const useStore = create<Store>()(
         if (password.length < 6) {
           throw new Error("Пароль должен быть не менее 6 символов");
         }
-        const isModerator = email === "admin@localgems.com";
+
+        const response = await authApi.login({ email, password });
+        const token = response.token ?? response.accessToken;
+
+        if (!token) {
+          throw new Error("Сервер не вернул токен авторизации");
+        }
+
+        const isModerator = response.role === "Admin" || email === "admin@localgems.com";
         set({
           isAuth: true,
           isModerator,
-          userEmail: email,
-          token: "mocked-jwt-token",
+          userEmail: response.email || email,
+          token,
         });
-        localStorage.setItem("authToken", "mocked-jwt-token");
+        localStorage.setItem("authToken", token);
       },
 
       register: async (email: string, password: string) => {
-        await new Promise((resolve) => setTimeout(resolve, 800));
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         if (!emailRegex.test(email)) {
           throw new Error("Неверный формат почты");
@@ -93,14 +113,26 @@ export const useStore = create<Store>()(
         if (password.length < 6) {
           throw new Error("Пароль должен быть не менее 6 символов");
         }
-        const isModerator = email === "admin@localgems.com";
+
+        const response = await authApi.register({
+          email,
+          password,
+          name: email.split("@")[0],
+        });
+        const token = response.token ?? response.accessToken;
+
+        if (!token) {
+          throw new Error("Сервер не вернул токен авторизации");
+        }
+
+        const isModerator = response.role === "Admin" || email === "admin@localgems.com";
         set({
           isAuth: true,
           isModerator,
-          userEmail: email,
-          token: "mocked-jwt-token",
+          userEmail: response.email || email,
+          token,
         });
-        localStorage.setItem("authToken", "mocked-jwt-token");
+        localStorage.setItem("authToken", token);
       },
 
       logout: () => {
