@@ -181,7 +181,7 @@ const ModeratorPage = () => {
     setConfirmModal({ isOpen: false, message: "", onConfirm: () => {} });
   };
 
-  const handleEdit = (id: number) => {
+  const handleEdit = (id: number | string) => {
     const place = places.find((p) => p.id === id);
     if (place) {
       setEditingPlace(place);
@@ -189,14 +189,14 @@ const ModeratorPage = () => {
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: number | string) => {
     openConfirm("Вы уверены, что хотите удалить это место?", () => {
       setPlaces(places.filter((p) => p.id !== id));
       closeConfirm();
     });
   };
 
-  const handleApprove = (id: number) => {
+  const handleApprove = (id: number | string) => {
     setPlaces(
       places.map((p) =>
         p.id === id ? { ...p, status: "published" } : p
@@ -204,7 +204,7 @@ const ModeratorPage = () => {
     );
   };
 
-  const handleReject = (id: number) => {
+  const handleReject = (id: number | string) => {
     openConfirm("Вы уверены, что хотите отклонить это место?", () => {
       setPlaces(
         places.map((p) =>

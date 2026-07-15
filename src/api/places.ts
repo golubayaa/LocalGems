@@ -51,35 +51,29 @@ const mapStatus = (status?: unknown): Place["status"] => {
   return "moderation";
 };
 
-const createStableId = (value: unknown, fallbackIndex: number): number => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim()) {
-    let hash = 0;
-    for (let i = 0; i < value.length; i += 1) {
-      hash = (hash << 5) - hash + value.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash) + fallbackIndex + 1;
-  }
-
-  return Date.now() + fallbackIndex;
+const isGuidLike = (value: unknown): value is string => {
+  return typeof value === "string" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value.trim());
 };
 
-const mapBackendPlace = (item: Record<string, unknown>, fallbackIndex = 0): Place => {
+const mapBackendPlace = (item: Record<string, unknown>): Place => {
   const latitude = Number(item.latitude ?? item.lat ?? 56.8389);
   const longitude = Number(item.longitude ?? item.lng ?? 60.6057);
-  const numericId = Number(item.id ?? item.placeId ?? Date.now());
+  const rawId = item.id ?? item.Id ?? item.placeId ?? item.PlaceId ?? item.guid ?? item.Guid;
+  const placeId = typeof rawId === "number"
+    ? rawId
+    : typeof rawId === "string"
+      ? rawId.trim()
+      : "";
+  const guid = typeof placeId === "string" && isGuidLike(placeId) ? placeId : undefined;
 
   return {
-    id: Number.isFinite(numericId) ? numericId : createStableId(item.id ?? item.placeId, fallbackIndex),
+    id: placeId,
+    guid,
     name: String(item.name ?? "Без названия"),
     category: mapCategoryCodeToLabel(item.category),
     address: String(item.address ?? item.location ?? "Адрес не указан"),
     status: mapStatus(item.status),
-    rating: item.rating ? Number(item.rating) : undefined,
+    rating: typeof item.rating === "number" ? item.rating : undefined,
     lat: Number.isFinite(latitude) ? latitude : 56.8389,
     lng: Number.isFinite(longitude) ? longitude : 60.6057,
     description: typeof item.description === "string" ? item.description : undefined,
@@ -87,25 +81,15 @@ const mapBackendPlace = (item: Record<string, unknown>, fallbackIndex = 0): Plac
 };
 
 const normalizePlacesPayload = (payload: unknown): Place[] => {
-  if (Array.isArray(payload)) {
-    return payload.map((item, index) => mapBackendPlace(item as Record<string, unknown>, index));
-  }
-
   if (payload && typeof payload === "object") {
     const record = payload as Record<string, unknown>;
-    const candidates = [record.items, record.places, record.data, record.results, record.content];
-    const arrayCandidate = candidates.find((value): value is unknown[] => Array.isArray(value));
-    if (arrayCandidate) {
-      return arrayCandidate.map((item, index) => mapBackendPlace(item as Record<string, unknown>, index));
-    }
+    const places = Array.isArray(record.places)
+      ? record.places
+      : Array.isArray(record.items)
+        ? record.items
+        : [];
 
-    if (typeof record.places === "object" && record.places && !Array.isArray(record.places)) {
-      const nested = record.places as Record<string, unknown>;
-      const nestedItems = nested.items;
-      if (Array.isArray(nestedItems)) {
-        return nestedItems.map((item, index) => mapBackendPlace(item as Record<string, unknown>, index));
-      }
-    }
+    return places.map((item) => mapBackendPlace(item as Record<string, unknown>));
   }
 
   return [];

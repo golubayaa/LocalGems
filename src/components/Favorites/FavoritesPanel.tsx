@@ -12,14 +12,14 @@ const FavoritesPanel = ({ isOpen, onClose }: FavoritesPanelProps) => {
 
   if (!isOpen) return null;
 
-  const handleAddToRoute = (id: number) => {
+  const handleAddToRoute = (id: number | string) => {
     const place = favorites.find((p) => p.id === id);
     if (place) {
       addToRoute(place);
     }
   };
 
-  const handleRemoveFromRoute = (id: number) => {
+  const handleRemoveFromRoute = (id: number | string) => {
     const place = favorites.find((p) => p.id === id);
     if (place) {
       removeFromRoute(id);

@@ -3,10 +3,10 @@ import type { Place } from "../../data/mockPlaces";
 
 interface PlaceRowProps {
   place: Place;
-  onEdit: (id: number) => void;
-  onDelete: (id: number) => void;
-  onApprove?: (id: number) => void;
-  onReject?: (id: number) => void;
+  onEdit: (id: number | string) => void;
+  onDelete: (id: number | string) => void;
+  onApprove?: (id: number | string) => void;
+  onReject?: (id: number | string) => void;
 }
 
 const PlaceRow = ({ place, onEdit, onDelete, onApprove, onReject }: PlaceRowProps) => {
