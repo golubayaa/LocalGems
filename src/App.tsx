@@ -1,4 +1,5 @@
 // src/App.tsx
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from "./components/Header/Header";
 import ModeratorHeader from "./components/ModeratorHeader/ModeratorHeader";
@@ -39,7 +40,13 @@ const ProtectedRoute = ({
 };
 
 function App() {
-  const { isModerator } = useStore();
+  const { isModerator, isAuth, loadFavorites } = useStore();
+
+  useEffect(() => {
+    if (isAuth) {
+      void loadFavorites();
+    }
+  }, [isAuth, loadFavorites]);
 
   return (
     <BrowserRouter>

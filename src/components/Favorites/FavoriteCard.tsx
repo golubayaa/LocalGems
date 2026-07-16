@@ -4,9 +4,9 @@ import type { Place } from "../../data/mockPlaces";
 interface FavoriteCardProps {
   place: Place;
   isInRoute: boolean;
-  onRemove: (id: number) => void;
-  onAddToRoute: (id: number) => void;
-  onRemoveFromRoute: (id: number) => void;
+  onRemove: (id: number | string) => void;
+  onAddToRoute: (id: number | string) => void;
+  onRemoveFromRoute: (id: number | string) => void;
 }
 
 const FavoriteCard = ({ place, isInRoute, onRemove, onAddToRoute, onRemoveFromRoute }: FavoriteCardProps) => {

@@ -1,19 +1,80 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 // src/components/pages/ModeratorPage.tsx
 import { useState, useMemo, useEffect } from "react";
-import { mockPlaces, type Place } from "../../data/mockPlaces";
+import type { Place } from "../../data/mockPlaces";
 import { categories } from "../../data/categories";
 import PlaceRow from "../Moderator/PlaceRow";
 import EditPlaceModal from "../Moderator/EditPlaceModal";
 import ConfirmModal from "../Moderator/ConfirmModal";
+import { placesApi } from "../../api/places";
+import { moderationApi } from "../../api/moderation";
 
 const statuses = ["Все статусы", "Опубликовано", "На модерации", "Отклонено"];
 
+const normalizeModerationPlaces = (payload: unknown): Place[] => {
+  const extractItems = (value: unknown): unknown[] => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+
+    if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      const candidates = [
+        record.pendingSuggestions,
+        record.items,
+        record.places,
+        record.data,
+        record.results,
+        record.content,
+      ];
+      const arrayCandidate = candidates.find((candidate): candidate is unknown[] => Array.isArray(candidate));
+      return arrayCandidate ?? [];
+    }
+
+    return [];
+  };
+
+  const items = Array.isArray(payload) ? payload : extractItems(payload);
+
+  return items.map((item, index) => {
+    const record = item as Record<string, unknown>;
+    const latitude = Number(record.latitude ?? record.lat ?? 56.8389);
+    const longitude = Number(record.longitude ?? record.lng ?? 60.6057);
+    const rawId = record.id ?? record.placeId ?? record.suggestionId ?? index;
+    let numericId = Number(rawId);
+
+    if (!Number.isFinite(numericId)) {
+      let hash = 0;
+      const text = String(rawId);
+      for (let i = 0; i < text.length; i += 1) {
+        hash = (hash << 5) - hash + text.charCodeAt(i);
+        hash |= 0;
+      }
+      numericId = Math.abs(hash) + index + 1;
+    }
+
+    return {
+      id: numericId,
+      name: String(record.name ?? record.title ?? record.placeName ?? "Без названия"),
+      category: String(record.category ?? record.categoryName ?? "Неизвестно"),
+      address: String(record.address ?? record.location ?? "Адрес не указан"),
+      status: "moderation" as const,
+      rating: record.rating ? Number(record.rating) : undefined,
+      lat: Number.isFinite(latitude) ? latitude : 56.8389,
+      lng: Number.isFinite(longitude) ? longitude : 60.6057,
+      description: typeof record.description === "string" ? record.description : undefined,
+    };
+  });
+};
+
 // Количество записей на страницу
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 20;
 
 const ModeratorPage = () => {
-  const [places, setPlaces] = useState<Place[]>(mockPlaces);
+  const [allPlaces, setAllPlaces] = useState<Place[]>([]);
+  const [moderationPlaces, setModerationPlaces] = useState<Place[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -37,6 +98,45 @@ const ModeratorPage = () => {
 
   // Пагинация
   const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    const loadPlaces = async () => {
+      if (activeTab !== "all") {
+        return;
+      }
+
+      try {
+        const remotePlaces = await placesApi.listPage(currentPage, ITEMS_PER_PAGE);
+        setAllPlaces(remotePlaces);
+        setPlaces(remotePlaces);
+        setHasNextPage(remotePlaces.length === ITEMS_PER_PAGE);
+      } catch (error) {
+        console.error("Failed to load moderator places", error);
+      }
+    };
+
+    loadPlaces();
+  }, [activeTab, currentPage]);
+
+  useEffect(() => {
+    if (activeTab !== "moderation") {
+      return;
+    }
+
+    const loadModerationQueue = async () => {
+      try {
+        const queuePayload = await moderationApi.listQueue(currentPage, ITEMS_PER_PAGE);
+        const nextPlaces = normalizeModerationPlaces(queuePayload);
+        setModerationPlaces(nextPlaces);
+        setPlaces(nextPlaces);
+        setHasNextPage(nextPlaces.length === ITEMS_PER_PAGE);
+      } catch (error) {
+        console.error("Failed to load moderation queue", error);
+      }
+    };
+
+    loadModerationQueue();
+  }, [activeTab, currentPage]);
 
   const filteredPlaces = useMemo(() => {
     let filtered = places;
@@ -66,15 +166,7 @@ const ModeratorPage = () => {
     return filtered;
   }, [places, search, selectedCategories, selectedStatuses, activeTab]);
 
-  // Вычисляем общее количество страниц
-  const totalPages = Math.ceil(filteredPlaces.length / ITEMS_PER_PAGE);
-
-  // Получаем текущую страницу данных
-  const currentPlaces = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE;
-    return filteredPlaces.slice(start, end);
-  }, [filteredPlaces, currentPage]);
+  const currentPlaces = filteredPlaces;
 
   // Сброс страницы при изменении фильтров (используем useEffect, а не useMemo)
   useEffect(() => {
@@ -89,7 +181,7 @@ const ModeratorPage = () => {
     setConfirmModal({ isOpen: false, message: "", onConfirm: () => {} });
   };
 
-  const handleEdit = (id: number) => {
+  const handleEdit = (id: number | string) => {
     const place = places.find((p) => p.id === id);
     if (place) {
       setEditingPlace(place);
@@ -97,14 +189,14 @@ const ModeratorPage = () => {
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: number | string) => {
     openConfirm("Вы уверены, что хотите удалить это место?", () => {
       setPlaces(places.filter((p) => p.id !== id));
       closeConfirm();
     });
   };
 
-  const handleApprove = (id: number) => {
+  const handleApprove = (id: number | string) => {
     setPlaces(
       places.map((p) =>
         p.id === id ? { ...p, status: "published" } : p
@@ -112,7 +204,7 @@ const ModeratorPage = () => {
     );
   };
 
-  const handleReject = (id: number) => {
+  const handleReject = (id: number | string) => {
     openConfirm("Вы уверены, что хотите отклонить это место?", () => {
       setPlaces(
         places.map((p) =>
@@ -288,7 +380,7 @@ const ModeratorPage = () => {
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            Все места ({places.length})
+            Все места ({allPlaces.length})
           </button>
           <button
             onClick={() => setActiveTab("moderation")}
@@ -298,7 +390,7 @@ const ModeratorPage = () => {
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            Предложенные ({places.filter((p) => p.status === "moderation").length})
+            Предложенные ({moderationPlaces.length})
           </button>
         </div>
 
@@ -350,10 +442,10 @@ const ModeratorPage = () => {
         </div>
 
         {/* Пагинация */}
-        {totalPages > 1 && (
+        {(currentPage > 1 || hasNextPage) && (
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-gray-500">
-              Показано {currentPlaces.length} из {filteredPlaces.length} записей
+              Показано {currentPlaces.length} записей
             </div>
             <div className="flex gap-2">
               <button
@@ -364,11 +456,11 @@ const ModeratorPage = () => {
                 ←
               </button>
               <span className="px-3 py-1 text-sm font-medium">
-                {currentPage} / {totalPages}
+                Страница {currentPage}
               </span>
               <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((prev) => prev + 1)}
+                disabled={!hasNextPage}
                 className="px-3 py-1 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 →

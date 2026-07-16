@@ -4,7 +4,7 @@ import type { Place } from "../../data/mockPlaces";
 interface RoutePointItemProps {
   point: Place;
   index: number;
-  onRemove: (id: number) => void;
+  onRemove: (id: number | string) => void;
 }
 
 const RoutePointItem = ({ point, index, onRemove }: RoutePointItemProps) => {

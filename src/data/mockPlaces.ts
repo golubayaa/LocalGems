@@ -1,6 +1,7 @@
 // src/data/mockPlaces.ts
 export interface Place {
-  id: number;
+  id: number | string;
+  guid?: string;
   name: string;
   category: string;
   address: string;
@@ -8,12 +9,15 @@ export interface Place {
   rating?: number;
   lat: number;
   lng: number;
-  description?: string; // добавлено
+  description?: string;
+  photoUrl?: string;
+  photos?: string[]; 
 }
 
 export const mockPlaces: Place[] = [
   {
     id: 1,
+    guid: "019f6387-dddb-77ef-a7f2-516033659fc3",
     name: "Кофейня Уголок",
     category: "Кафе",
     address: "ул. Ленина, 15",

@@ -1,0 +1,763 @@
+openapi: 3.0.4
+info:
+  title: LocalGems API
+  version: v1
+paths:
+  /api/admin/users:
+    post:
+      tags:
+        - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateUserRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateUserRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateUserRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+    get:
+      tags:
+        - Admin
+      responses:
+        '200':
+          description: OK
+  '/api/admin/users/{userId}/promote':
+    post:
+      tags:
+        - Admin
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromoteUserRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/PromoteUserRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/PromoteUserRequest'
+      responses:
+        '200':
+          description: OK
+  '/api/admin/users/{userId}/demote':
+    post:
+      tags:
+        - Admin
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /api/auth/register:
+    post:
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/auth/me:
+    get:
+      tags:
+        - Auth
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+            text/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/moderation/queue:
+    get:
+      tags:
+        - Moderation
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 20
+      responses:
+        '200':
+          description: OK
+  '/api/moderation/suggestions/{id}/approve':
+    post:
+      tags:
+        - Moderation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+      responses:
+        '200':
+          description: OK
+  '/api/moderation/suggestions/{id}/reject':
+    post:
+      tags:
+        - Moderation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+      responses:
+        '200':
+          description: OK
+  '/api/moderation/suggestions/{id}/revision':
+    post:
+      tags:
+        - Moderation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+      responses:
+        '200':
+          description: OK
+  '/api/moderation/updates/{id}/approve':
+    post:
+      tags:
+        - Moderation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+      responses:
+        '200':
+          description: OK
+  '/api/moderation/updates/{id}/reject':
+    post:
+      tags:
+        - Moderation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/ModerationDecisionRequest'
+      responses:
+        '200':
+          description: OK
+  /api/places:
+    get:
+      tags:
+        - Places
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/PlaceCategory'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            format: int32
+            default: 20
+      responses:
+        '200':
+          description: OK
+  '/api/places/{id}':
+    get:
+      tags:
+        - Places
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  '/api/places/{placeId}/updates':
+    post:
+      tags:
+        - PlaceUpdates
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlaceUpdateRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlaceUpdateRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreatePlaceUpdateRequest'
+      responses:
+        '200':
+          description: OK
+    get:
+      tags:
+        - PlaceUpdates
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /api/routes:
+    get:
+      tags:
+        - Routes
+      responses:
+        '200':
+          description: OK
+    post:
+      tags:
+        - Routes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+      responses:
+        '200':
+          description: OK
+  '/api/routes/{id}':
+    get:
+      tags:
+        - Routes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+    put:
+      tags:
+        - Routes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags:
+        - Routes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  '/api/routes/{id}/waypoints':
+    post:
+      tags:
+        - Routes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddWaypointRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AddWaypointRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AddWaypointRequest'
+      responses:
+        '200':
+          description: OK
+  '/api/routes/{id}/waypoints/{placeId}':
+    delete:
+      tags:
+        - Routes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  '/api/routes/{id}/export/yandex':
+    get:
+      tags:
+        - Routes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /api/suggestions:
+    post:
+      tags:
+        - Suggestions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSuggestionRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/CreateSuggestionRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/CreateSuggestionRequest'
+      responses:
+        '200':
+          description: OK
+  /api/suggestions/my:
+    get:
+      tags:
+        - Suggestions
+      responses:
+        '200':
+          description: OK
+  '/api/suggestions/{id}':
+    get:
+      tags:
+        - Suggestions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /api/Test:
+    get:
+      tags:
+        - Test
+      responses:
+        '200':
+          description: OK
+  /api/wishlist:
+    get:
+      tags:
+        - Wishlists
+      responses:
+        '200':
+          description: OK
+  /api/wishlist/items:
+    post:
+      tags:
+        - Wishlists
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddPlaceToWishlistRequest'
+          text/json:
+            schema:
+              $ref: '#/components/schemas/AddPlaceToWishlistRequest'
+          application/*+json:
+            schema:
+              $ref: '#/components/schemas/AddPlaceToWishlistRequest'
+      responses:
+        '200':
+          description: OK
+  '/api/wishlist/items/{placeId}':
+    delete:
+      tags:
+        - Wishlists
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    AddPlaceToWishlistRequest:
+      type: object
+      properties:
+        placeId:
+          type: string
+          format: uuid
+      additionalProperties: false
+    AddWaypointRequest:
+      type: object
+      properties:
+        placeId:
+          type: string
+          format: uuid
+      additionalProperties: false
+    AdminCreateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          nullable: true
+        password:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        role:
+          $ref: '#/components/schemas/UserRole'
+      additionalProperties: false
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        role:
+          type: string
+          nullable: true
+      additionalProperties: false
+    CreatePlaceUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        category:
+          $ref: '#/components/schemas/PlaceCategory'
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+      additionalProperties: false
+    CreateRouteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+      additionalProperties: false
+    CreateSuggestionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        category:
+          $ref: '#/components/schemas/PlaceCategory'
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+      additionalProperties: false
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          nullable: true
+        password:
+          type: string
+          nullable: true
+      additionalProperties: false
+    ModerationDecisionRequest:
+      type: object
+      properties:
+        comment:
+          type: string
+          nullable: true
+      additionalProperties: false
+    PlaceCategory:
+      enum:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+      type: integer
+      format: int32
+    PromoteUserRequest:
+      type: object
+      properties:
+        newRole:
+          $ref: '#/components/schemas/UserRole'
+      additionalProperties: false
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          nullable: true
+        password:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+      additionalProperties: false
+    UserRole:
+      enum:
+        - 0
+        - 1
+        - 2
+      type: integer
+      format: int32
+  securitySchemes:
+    token:
+      type: http
+      scheme: Bearer
+      bearerFormat: JWT
+security:
+  - token: [ ]

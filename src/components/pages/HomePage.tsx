@@ -8,9 +8,11 @@ import FavoritesPanel from "../Favorites/FavoritesPanel";
 import RoutePanel from "../Route/RoutePanel";
 import { useStore } from "../../store/useStore";
 import { categories } from "../../data/categories";
+import { placesApi } from "../../api/places";
 
 const HomePage = () => {
   const places = useStore((state) => state.places);
+  const setPlaces = useStore((state) => state.setPlaces);
 
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,6 +24,17 @@ const HomePage = () => {
   const allCategories = categories;
 
   useEffect(() => {
+    const loadPlaces = async () => {
+      try {
+        const remotePlaces = await placesApi.list({ size: 300 });
+        setPlaces(remotePlaces);
+      } catch (error) {
+        console.error("Failed to load places", error);
+      }
+    };
+
+    loadPlaces();
+
     (window as any).openAddPlaceModal = () => setIsAddModalOpen(true);
     (window as any).openFavoritesPanel = () => setIsFavoritesOpen(true);
     (window as any).openRoutePanel = () => setIsRouteOpen(true);
@@ -30,7 +43,7 @@ const HomePage = () => {
       delete (window as any).openFavoritesPanel;
       delete (window as any).openRoutePanel;
     };
-  }, []);
+  }, [setPlaces]);
 
   const toggleCategory = (category: string) => {
     setSelectedCategories((prev) =>

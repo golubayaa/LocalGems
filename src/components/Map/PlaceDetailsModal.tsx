@@ -13,6 +13,7 @@ interface PlaceDetailsModalProps {
 const PlaceDetailsModal = ({ place, isOpen, onClose }: PlaceDetailsModalProps) => {
   const { favorites, route, isAuth, addFavorite, removeFavorite, addToRoute, removeFromRoute } = useStore();
   const [shareMessage, setShareMessage] = useState("Поделиться");
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -27,10 +28,36 @@ const PlaceDetailsModal = ({ place, isOpen, onClose }: PlaceDetailsModalProps) =
   useEffect(() => {
     if (!isOpen) {
       setShareMessage("Поделиться");
+      setImageError(false);
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    setImageError(false);
+  }, [place?.photoUrl]);
+
   if (!isOpen || !place) return null;
+
+  const normalizedPhotoUrl = (() => {
+  if (!place.photoUrl) return undefined;
+
+  const trimmed = place.photoUrl.trim().replace(/^['"]|['"]$/g, "");
+  if (!trimmed) return undefined;
+
+  const withProtocol = trimmed.startsWith("http://")
+    ? trimmed.replace(/^http:\/\//, "https://")
+    : trimmed.startsWith("https://") || trimmed.startsWith("//")
+      ? trimmed.startsWith("//") ? `https:${trimmed}` : trimmed
+      : `https://${trimmed}`;
+
+  // Если это Unsplash и параметров нет, добавляем их для оптимизации и обхода блокировок CDN
+  if (withProtocol.includes("images.unsplash.com") && !withProtocol.includes("?")) {
+    return `${withProtocol}?auto=format&fit=crop&w=800&q=80`;
+  }
+  
+  // Не обрезаем параметры через split("?")[0]!
+  return withProtocol;
+  })();
 
   const isFavorite = favorites.some((p) => p.id === place.id);
   const isInRoute = route.some((p) => p.id === place.id);
@@ -88,7 +115,20 @@ const PlaceDetailsModal = ({ place, isOpen, onClose }: PlaceDetailsModalProps) =
           </button>
         </div>
 
-        <div className="w-full h-48 bg-gray-200" />
+        <div className="w-full h-48 bg-gray-200">
+          {normalizedPhotoUrl && !imageError ? (
+            <img
+              src={normalizedPhotoUrl}
+              alt={place.name}
+              className="w-full h-full object-cover"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
+              Фото отсутствует
+            </div>
+          )}
+        </div>
 
         <div className="p-6 space-y-4">
           <h2 className="text-2xl font-bold text-gray-900">{place.name}</h2>

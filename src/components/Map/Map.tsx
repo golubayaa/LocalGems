@@ -202,12 +202,14 @@ const Map = ({ className = "", places, center }: MapProps) => {
   }, [route, addToRoute, removeFromRoute]);
 
   const markers = useMemo(() => {
-    return places.map((place) => {
+    return places.map((place, index) => {
       const color = categoryColorMap[place.category] || "#2A7DE1";
       const iconSVG = createIcon(color);
+      const markerKey = `${place.guid ?? place.id ?? "place"}-${index}`;
+
       return (
         <Placemark
-          key={place.id}
+          key={markerKey}
           geometry={[place.lat, place.lng]}
           onClick={() => handlePlaceClick(place)}
           onMouseEnter={(e: YandexMapEvent) => handleMouseEnter(place, e)}
