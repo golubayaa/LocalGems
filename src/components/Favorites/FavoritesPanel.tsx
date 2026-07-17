@@ -1,6 +1,9 @@
 // src/components/Favorites/FavoritesPanel.tsx
+import { useEffect } from "react";
 import { useStore } from "../../store/useStore";
 import FavoriteCard from "./FavoriteCard";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useSwipeToClose } from "../../hooks/useSwipeToClose";
 
 interface FavoritesPanelProps {
   isOpen: boolean;
@@ -9,6 +12,24 @@ interface FavoritesPanelProps {
 
 const FavoritesPanel = ({ isOpen, onClose }: FavoritesPanelProps) => {
   const { favorites, route, removeFavorite, addToRoute, removeFromRoute } = useStore();
+  const isMobile = !useMediaQuery("(min-width: 768px)");
+
+  const { panelRef, handleTouchStart, handleTouchMove, handleTouchEnd, style } = useSwipeToClose({
+    isOpen,
+    onClose,
+    threshold: 80,
+  });
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -27,14 +48,35 @@ const FavoritesPanel = ({ isOpen, onClose }: FavoritesPanelProps) => {
   };
 
   return (
-    <div className="fixed inset-0 z-40 pointer-events-none">
-      <div className="absolute inset-0 bg-black/30 pointer-events-auto" onClick={onClose} />
+    <div className="fixed inset-0 z-[60]">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
-      <aside
-        className="absolute top-0 right-0 w-[400px] h-full bg-white shadow-2xl pointer-events-auto flex flex-col"
+      <div
+        ref={panelRef}
+        className={`
+          absolute bg-white shadow-2xl flex flex-col
+          ${isMobile
+            ? "left-0 right-0 rounded-t-2xl"
+            : "top-0 right-0 w-[400px] h-full"
+          }
+        `}
+        style={{
+          top: isMobile ? "40px" : "0",
+          bottom: isMobile ? "0" : "auto",
+          height: isMobile ? "auto" : "100%",
+          ...style,
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        {/* Ручка */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+
+        <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-xl font-bold text-gray-900">Избранное</h2>
           <button
             onClick={onClose}
@@ -60,7 +102,7 @@ const FavoritesPanel = ({ isOpen, onClose }: FavoritesPanelProps) => {
             ))
           )}
         </div>
-      </aside>
+      </div>
     </div>
   );
 };

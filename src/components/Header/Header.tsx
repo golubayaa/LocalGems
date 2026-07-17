@@ -6,12 +6,12 @@ import LoginModal from "../Auth/LoginModal";
 import RegisterModal from "../Auth/RegisterModal";
 import ConfirmModal from "../Moderator/ConfirmModal";
 
-// Расширяем Window для глобальных функций
 declare global {
   interface Window {
     openAddPlaceModal?: () => void;
     openFavoritesPanel?: () => void;
     openRoutePanel?: () => void;
+    toggleMobileMenu?: () => void;
   }
 }
 
@@ -45,19 +45,38 @@ const Header = () => {
     setShowLogoutConfirm(false);
   };
 
+  const toggleMobileMenu = () => {
+    if (window.toggleMobileMenu) {
+      window.toggleMobileMenu();
+    }
+  };
+
   return (
     <>
-      <header className="h-16 bg-white border-b border-gray-200 shadow-sm px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <header className="h-16 bg-white border-b border-gray-200 shadow-sm px-4 sm:px-6 flex items-center justify-between relative z-50">
+        {/* Бургер слева (только на мобилке) */}
+        <button
+          onClick={toggleMobileMenu}
+          className="md:hidden flex flex-col items-center justify-center w-8 h-8 gap-1.5 focus:outline-none"
+          aria-label="Меню"
+        >
+          <span className="block w-6 h-0.5 bg-gray-800" />
+          <span className="block w-6 h-0.5 bg-gray-800" />
+          <span className="block w-6 h-0.5 bg-gray-800" />
+        </button>
+
+        {/* Логотип по центру на мобилке, слева на десктопе */}
+        <div className="flex-1 md:flex-none flex justify-center md:justify-start">
           <span
-            className="text-2xl font-bold text-blue-600 cursor-pointer"
+            className="text-xl sm:text-2xl font-bold text-blue-600 cursor-pointer"
             onClick={() => navigate("/")}
           >
             LocalGems
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Десктопные кнопки */}
+        <div className="hidden md:flex items-center gap-4">
           {isAuth && !isModerator && (
             <>
               <button
@@ -89,6 +108,28 @@ const Header = () => {
           ) : (
             <button
               className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+              onClick={() => setIsLoginOpen(true)}
+            >
+              Войти
+            </button>
+          )}
+        </div>
+
+        {/* Справа на мобилке: кнопка Войти/Выйти или почта (коротко) */}
+        <div className="md:hidden flex items-center gap-2">
+          {isAuth ? (
+            <>
+              <span className="text-sm text-gray-700 truncate max-w-[100px]">{userEmail}</span>
+              <button
+                className="text-sm font-medium text-red-500 hover:text-red-700 transition"
+                onClick={handleLogout}
+              >
+                Выйти
+              </button>
+            </>
+          ) : (
+            <button
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 transition"
               onClick={() => setIsLoginOpen(true)}
             >
               Войти

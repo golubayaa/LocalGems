@@ -8,8 +8,10 @@ import EditPlaceModal from "../Moderator/EditPlaceModal";
 import ConfirmModal from "../Moderator/ConfirmModal";
 import { placesApi } from "../../api/places";
 import { moderationApi } from "../../api/moderation";
+import { mapCategoryCodeToLabel } from "../../api/places"; // <-- импортируем функцию
 
-const statuses = ["Все статусы", "Опубликовано", "На модерации", "Отклонено"];
+// Убрали "Отклонено"
+const statuses = ["Все статусы", "Опубликовано", "На модерации"];
 
 const normalizeModerationPlaces = (payload: unknown): Place[] => {
   const extractItems = (value: unknown): unknown[] => {
@@ -36,27 +38,34 @@ const normalizeModerationPlaces = (payload: unknown): Place[] => {
 
   const items = Array.isArray(payload) ? payload : extractItems(payload);
 
-  return items.map((item, index) => {
+  return items.map((item) => {
     const record = item as Record<string, unknown>;
     const latitude = Number(record.latitude ?? record.lat ?? 56.8389);
     const longitude = Number(record.longitude ?? record.lng ?? 60.6057);
-    const rawId = record.id ?? record.placeId ?? record.suggestionId ?? index;
-    let numericId = Number(rawId);
+    const rawId = record.id ?? record.placeId ?? record.suggestionId;
+    let id = rawId !== undefined ? String(rawId) : null;
 
-    if (!Number.isFinite(numericId)) {
-      let hash = 0;
-      const text = String(rawId);
-      for (let i = 0; i < text.length; i += 1) {
-        hash = (hash << 5) - hash + text.charCodeAt(i);
-        hash |= 0;
-      }
-      numericId = Math.abs(hash) + index + 1;
+    // Если id не является строкой GUID, возможно, это число. Попробуем взять из другого поля?
+    // Добавим логирование, чтобы видеть, что приходит.
+    console.log("🔍 Нормализация элемента модерации:", {
+      rawId,
+      id,
+      name: record.name,
+      category: record.category,
+    });
+
+    if (!id) {
+      console.warn("⚠️ Пропуск элемента без id:", record);
+      return null;
     }
 
+    // Преобразуем категорию из кода в название
+    const categoryLabel = mapCategoryCodeToLabel(record.category);
+
     return {
-      id: numericId,
+      id, // сохраняем как строку (должен быть GUID)
       name: String(record.name ?? record.title ?? record.placeName ?? "Без названия"),
-      category: String(record.category ?? record.categoryName ?? "Неизвестно"),
+      category: categoryLabel,
       address: String(record.address ?? record.location ?? "Адрес не указан"),
       status: "moderation" as const,
       rating: record.rating ? Number(record.rating) : undefined,
@@ -64,7 +73,7 @@ const normalizeModerationPlaces = (payload: unknown): Place[] => {
       lng: Number.isFinite(longitude) ? longitude : 60.6057,
       description: typeof record.description === "string" ? record.description : undefined,
     };
-  });
+  }).filter((p): p is Place => p !== null);
 };
 
 // Количество записей на страницу
@@ -96,15 +105,11 @@ const ModeratorPage = () => {
     onConfirm: () => {},
   });
 
-  // Пагинация
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const loadPlaces = async () => {
-      if (activeTab !== "all") {
-        return;
-      }
-
+      if (activeTab !== "all") return;
       try {
         const remotePlaces = await placesApi.listPage(currentPage, ITEMS_PER_PAGE);
         setAllPlaces(remotePlaces);
@@ -114,15 +119,11 @@ const ModeratorPage = () => {
         console.error("Failed to load moderator places", error);
       }
     };
-
     loadPlaces();
   }, [activeTab, currentPage]);
 
   useEffect(() => {
-    if (activeTab !== "moderation") {
-      return;
-    }
-
+    if (activeTab !== "moderation") return;
     const loadModerationQueue = async () => {
       try {
         const queuePayload = await moderationApi.listQueue(currentPage, ITEMS_PER_PAGE);
@@ -134,41 +135,34 @@ const ModeratorPage = () => {
         console.error("Failed to load moderation queue", error);
       }
     };
-
     loadModerationQueue();
   }, [activeTab, currentPage]);
 
   const filteredPlaces = useMemo(() => {
     let filtered = places;
-
     if (search.trim()) {
       filtered = filtered.filter((p) =>
         p.name.toLowerCase().includes(search.toLowerCase())
       );
     }
-
     if (selectedCategories.length > 0) {
       filtered = filtered.filter((p) =>
         selectedCategories.includes(p.category)
       );
     }
-
     if (selectedStatuses.length > 0) {
       filtered = filtered.filter((p) =>
         selectedStatuses.includes(p.status)
       );
     }
-
     if (activeTab === "moderation") {
       filtered = filtered.filter((p) => p.status === "moderation");
     }
-
     return filtered;
   }, [places, search, selectedCategories, selectedStatuses, activeTab]);
 
   const currentPlaces = filteredPlaces;
 
-  // Сброс страницы при изменении фильтров (используем useEffect, а не useMemo)
   useEffect(() => {
     setCurrentPage(1);
   }, [search, selectedCategories, selectedStatuses, activeTab]);
@@ -196,23 +190,37 @@ const ModeratorPage = () => {
     });
   };
 
-  const handleApprove = (id: number | string) => {
-    setPlaces(
-      places.map((p) =>
-        p.id === id ? { ...p, status: "published" } : p
-      )
-    );
-  };
-
-  const handleReject = (id: number | string) => {
-    openConfirm("Вы уверены, что хотите отклонить это место?", () => {
-      setPlaces(
-        places.map((p) =>
-          p.id === id ? { ...p, status: "rejected" } : p
-        )
-      );
-      closeConfirm();
-    });
+  const handleApprove = async (id: number | string) => {
+    try {
+      const stringId = String(id);
+      console.log("🔵 Отправка запроса на утверждение, ID:", stringId);
+      await placesApi.approveSuggestion(stringId);
+      console.log("🟢 Утверждение успешно");
+      setPlaces((prev) => prev.filter((p) => p.id !== id));
+      setAllPlaces((prev) => prev.filter((p) => p.id !== id));
+      setModerationPlaces((prev) => prev.filter((p) => p.id !== id));
+    } catch (error: any) {
+      console.error("🔴 Ошибка утверждения:", error);
+      let message = "Не удалось утвердить место. Попробуйте позже.";
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+        console.log("Статус ответа:", status);
+        console.log("Данные ошибки:", data);
+        if (data?.message) {
+          message = data.message;
+        } else if (status === 401) {
+          message = "Сессия истекла. Войдите заново.";
+        } else if (status === 404) {
+          message = "Место не найдено. Возможно, оно уже обработано.";
+        } else if (status === 400) {
+          message = "Неверный запрос. Проверьте данные.";
+        }
+      } else if (error.request) {
+        message = "Сервер не отвечает. Проверьте соединение.";
+      }
+      alert(message);
+    }
   };
 
   const handleSavePlace = (updatedPlace: Place) => {
@@ -249,12 +257,13 @@ const ModeratorPage = () => {
       setSelectedStatuses([]);
       return;
     }
+    const realValue = status === "Опубликовано" ? "published" : "moderation";
     setSelectedStatuses((prev) => {
-      if (prev.length === 0) return [status];
-      if (prev.includes(status)) {
-        return prev.filter((s) => s !== status);
+      if (prev.length === 0) return [realValue];
+      if (prev.includes(realValue)) {
+        return prev.filter((s) => s !== realValue);
       } else {
-        return [...prev, status];
+        return [...prev, realValue];
       }
     });
   };
@@ -271,7 +280,6 @@ const ModeratorPage = () => {
       const map: Record<string, string> = {
         published: "Опубликовано",
         moderation: "На модерации",
-        rejected: "Отклонено",
       };
       return map[selectedStatuses[0]] || selectedStatuses[0];
     }
@@ -342,7 +350,7 @@ const ModeratorPage = () => {
             {isStatusDropdownOpen && (
               <div className="absolute top-11 left-0 w-[180px] max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20">
                 {statuses.map((status) => {
-                  const realValue = status === "Опубликовано" ? "published" : status === "На модерации" ? "moderation" : "rejected";
+                  const realValue = status === "Опубликовано" ? "published" : "moderation";
                   const isChecked = status === "Все статусы"
                     ? selectedStatuses.length === 0
                     : selectedStatuses.includes(realValue);
@@ -432,7 +440,6 @@ const ModeratorPage = () => {
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       onApprove={handleApprove}
-                      onReject={handleReject}
                     />
                   ))
                 )}

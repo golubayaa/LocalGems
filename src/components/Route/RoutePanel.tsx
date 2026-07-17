@@ -1,8 +1,10 @@
 // src/components/Route/RoutePanel.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "../../store/useStore";
 import RoutePointItem from "./RoutePointItem";
 import ConfirmModal from "../Moderator/ConfirmModal";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useSwipeToClose } from "../../hooks/useSwipeToClose";
 
 interface RoutePanelProps {
   isOpen: boolean;
@@ -12,13 +14,30 @@ interface RoutePanelProps {
 const RoutePanel = ({ isOpen, onClose }: RoutePanelProps) => {
   const { route, removeFromRoute, clearRoute } = useStore();
   const [showConfirm, setShowConfirm] = useState(false);
+  const isMobile = !useMediaQuery("(min-width: 768px)");
+
+  const { panelRef, handleTouchStart, handleTouchMove, handleTouchEnd, style } = useSwipeToClose({
+    isOpen,
+    onClose,
+    threshold: 80,
+  });
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleExport = () => {
     if (route.length === 0) return;
     const coords = route.map((p) => `${p.lat},${p.lng}`).join("~");
-    // Добавляем ~ перед координатами, чтобы начальная точка была пустой
     const url = `https://yandex.ru/maps/?rtext=~${coords}&rtt=auto`;
     window.open(url, "_blank");
   };
@@ -33,13 +52,35 @@ const RoutePanel = ({ isOpen, onClose }: RoutePanelProps) => {
   };
 
   return (
-    <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <aside
-        className="absolute top-0 right-0 w-[400px] h-full bg-white shadow-2xl flex flex-col"
+    <div className="fixed inset-0 z-[60]">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+
+      <div
+        ref={panelRef}
+        className={`
+          absolute bg-white shadow-2xl flex flex-col
+          ${isMobile
+            ? "left-0 right-0 rounded-t-2xl"
+            : "top-0 right-0 w-[400px] h-full"
+          }
+        `}
+        style={{
+          top: isMobile ? "40px" : "0",
+          bottom: isMobile ? "0" : "auto",
+          height: isMobile ? "auto" : "100%",
+          ...style,
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        {/* Ручка */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+
+        <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-xl font-bold text-gray-900">Мой маршрут</h2>
           <button
             onClick={onClose}
@@ -64,7 +105,7 @@ const RoutePanel = ({ isOpen, onClose }: RoutePanelProps) => {
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-200 space-y-3">
+        <div className="p-4 border-t border-gray-200 space-y-3 flex-shrink-0">
           <button
             onClick={handleClear}
             className="text-sm font-medium text-red-500 hover:text-red-700 transition"
@@ -79,7 +120,7 @@ const RoutePanel = ({ isOpen, onClose }: RoutePanelProps) => {
             Экспорт в Яндекс.Карты
           </button>
         </div>
-      </aside>
+      </div>
 
       <ConfirmModal
         isOpen={showConfirm}
