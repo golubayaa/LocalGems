@@ -328,9 +328,13 @@ export const placesApi = {
     };
   },
 
-  // ✅ ДОБАВЛЯЕМ МЕТОД approveSuggestion
   approveSuggestion: async (id: string, comment?: string) => {
-    const response = await apiClient.post(`/suggestions/${id}/approve`, { comment });
+    const response = await apiClient.post(`/moderation/suggestions/${id}/approve`, { comment });
+    return response.data;
+  },
+
+  rejectSuggestion: async (id: string, comment?: string) => {
+    const response = await apiClient.post(`/moderation/suggestions/${id}/reject`, { comment });
     return response.data;
   },
 };

@@ -8,9 +8,8 @@ import EditPlaceModal from "../Moderator/EditPlaceModal";
 import ConfirmModal from "../Moderator/ConfirmModal";
 import { placesApi } from "../../api/places";
 import { moderationApi } from "../../api/moderation";
-import { mapCategoryCodeToLabel } from "../../api/places"; // <-- импортируем функцию
+import { mapCategoryCodeToLabel } from "../../api/places";
 
-// Убрали "Отклонено"
 const statuses = ["Все статусы", "Опубликовано", "На модерации"];
 
 const normalizeModerationPlaces = (payload: unknown): Place[] => {
@@ -38,45 +37,37 @@ const normalizeModerationPlaces = (payload: unknown): Place[] => {
 
   const items = Array.isArray(payload) ? payload : extractItems(payload);
 
-  return items.map((item) => {
-    const record = item as Record<string, unknown>;
-    const latitude = Number(record.latitude ?? record.lat ?? 56.8389);
-    const longitude = Number(record.longitude ?? record.lng ?? 60.6057);
-    const rawId = record.id ?? record.placeId ?? record.suggestionId;
-    let id = rawId !== undefined ? String(rawId) : null;
+  return items
+    .map((item): Place | null => {  // ⬅️ Явно указываем возвращаемый тип
+      const record = item as Record<string, unknown>;
+      const latitude = Number(record.latitude ?? record.lat ?? 56.8389);
+      const longitude = Number(record.longitude ?? record.lng ?? 60.6057);
+      const rawId = record.id ?? record.placeId ?? record.suggestionId;
+      const id = rawId !== undefined ? String(rawId) : null;
 
-    // Если id не является строкой GUID, возможно, это число. Попробуем взять из другого поля?
-    // Добавим логирование, чтобы видеть, что приходит.
-    console.log("🔍 Нормализация элемента модерации:", {
-      rawId,
-      id,
-      name: record.name,
-      category: record.category,
-    });
+      if (!id) {
+        console.warn("⚠️ Пропуск элемента без id:", record);
+        return null;
+      }
 
-    if (!id) {
-      console.warn("⚠️ Пропуск элемента без id:", record);
-      return null;
-    }
+      const categoryLabel = mapCategoryCodeToLabel(record.category);
 
-    // Преобразуем категорию из кода в название
-    const categoryLabel = mapCategoryCodeToLabel(record.category);
-
-    return {
-      id, // сохраняем как строку (должен быть GUID)
-      name: String(record.name ?? record.title ?? record.placeName ?? "Без названия"),
-      category: categoryLabel,
-      address: String(record.address ?? record.location ?? "Адрес не указан"),
-      status: "moderation" as const,
-      rating: record.rating ? Number(record.rating) : undefined,
-      lat: Number.isFinite(latitude) ? latitude : 56.8389,
-      lng: Number.isFinite(longitude) ? longitude : 60.6057,
-      description: typeof record.description === "string" ? record.description : undefined,
-    };
-  }).filter((p): p is Place => p !== null);
+      // ⬅️ Явно приводим к типу Place
+      return {
+        id: id as string | number,  // Приводим к совместимому типу
+        name: String(record.name ?? record.title ?? record.placeName ?? "Без названия"),
+        category: categoryLabel,
+        address: String(record.address ?? record.location ?? "Адрес не указан"),
+        status: "moderation" as const,
+        rating: record.rating ? Number(record.rating) : undefined,
+        lat: Number.isFinite(latitude) ? latitude : 56.8389,
+        lng: Number.isFinite(longitude) ? longitude : 60.6057,
+        description: typeof record.description === "string" ? record.description : undefined,
+      } as Place;  // ⬅️ Type assertion
+    })
+    .filter((p): p is Place => p !== null);  // ⬅️ Теперь type predicate работает корректно
 };
 
-// Количество записей на страницу
 const ITEMS_PER_PAGE = 20;
 
 const ModeratorPage = () => {
@@ -95,10 +86,11 @@ const ModeratorPage = () => {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
+  // ⬇️ ИЗМЕНЕНО: onConfirm теперь может быть async
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     message: string;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
   }>({
     isOpen: false,
     message: "",
@@ -106,6 +98,9 @@ const ModeratorPage = () => {
   });
 
   const [currentPage, setCurrentPage] = useState(1);
+
+  // ⬇️ НОВОЕ: ID места, которое сейчас обрабатывается (approve/reject)
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPlaces = async () => {
@@ -167,7 +162,8 @@ const ModeratorPage = () => {
     setCurrentPage(1);
   }, [search, selectedCategories, selectedStatuses, activeTab]);
 
-  const openConfirm = (message: string, onConfirm: () => void) => {
+  // ⬇️ ИЗМЕНЕНО: openConfirm принимает async-коллбэк
+  const openConfirm = (message: string, onConfirm: () => void | Promise<void>) => {
     setConfirmModal({ isOpen: true, message, onConfirm });
   };
 
@@ -183,30 +179,91 @@ const ModeratorPage = () => {
     }
   };
 
+  // ⬇️ ГЛАВНОЕ ИЗМЕНЕНИЕ: handleDelete теперь отправляет запрос на бэкенд
   const handleDelete = (id: number | string) => {
-    openConfirm("Вы уверены, что хотите удалить это место?", () => {
-      setPlaces(places.filter((p) => p.id !== id));
-      closeConfirm();
+    const stringId = String(id);
+
+    // Защита от двойного клика
+    if (processingId === stringId) return;
+
+    openConfirm("Вы уверены, что хотите отклонить это предложение?", async () => {
+      try {
+        setProcessingId(stringId);
+        console.log("🔵 Отправка запроса на отклонение, ID:", stringId);
+
+        // ⚠️ Сначала запрос на сервер (POST /api/moderation/suggestions/{id}/reject)
+        await moderationApi.rejectSuggestion(stringId, "Отклонено модератором");
+
+        console.log("🟢 Отклонение успешно");
+
+        // ✅ Только после успешного ответа обновляем UI
+        setPlaces((prev) => prev.filter((p) => p.id !== stringId));
+        setAllPlaces((prev) => prev.filter((p) => p.id !== stringId));
+        setModerationPlaces((prev) => prev.filter((p) => p.id !== stringId));
+
+        closeConfirm();
+      } catch (error: any) {
+        console.error("🔴 Ошибка отклонения:", error);
+
+        let message = "Не удалось отклонить предложение. Попробуйте позже.";
+        if (error.response) {
+          const status = error.response.status;
+          const data = error.response.data;
+          console.log("Статус ответа:", status);
+          console.log("Данные ошибки:", data);
+
+          if (data?.message) {
+            message = data.message;
+          } else if (status === 401) {
+            message = "Сессия истекла. Войдите заново.";
+          } else if (status === 404) {
+            message = "Предложение не найдено. Возможно, оно уже обработано.";
+          } else if (status === 400) {
+            message = "Неверный запрос. Проверьте данные.";
+          } else if (status === 403) {
+            message = "Недостаточно прав для этого действия.";
+          }
+        } else if (error.request) {
+          message = "Сервер не отвечает. Проверьте соединение.";
+        }
+
+        // ❌ При ошибке НЕ закрываем модалку, чтобы пользователь мог повторить
+        alert(message);
+      } finally {
+        setProcessingId(null);
+      }
     });
   };
 
+  // ⬇️ ИЗМЕНЕНО: используем moderationApi вместо placesApi для правильного URL
   const handleApprove = async (id: number | string) => {
+    const stringId = String(id);
+
+    // Защита от двойного клика
+    if (processingId === stringId) return;
+
     try {
-      const stringId = String(id);
+      setProcessingId(stringId);
       console.log("🔵 Отправка запроса на утверждение, ID:", stringId);
-      await placesApi.approveSuggestion(stringId);
+
+      // ⚠️ POST /api/moderation/suggestions/{id}/approve
+      await moderationApi.approveSuggestion(stringId);
+
       console.log("🟢 Утверждение успешно");
-      setPlaces((prev) => prev.filter((p) => p.id !== id));
-      setAllPlaces((prev) => prev.filter((p) => p.id !== id));
-      setModerationPlaces((prev) => prev.filter((p) => p.id !== id));
+
+      setPlaces((prev) => prev.filter((p) => p.id !== stringId));
+      setAllPlaces((prev) => prev.filter((p) => p.id !== stringId));
+      setModerationPlaces((prev) => prev.filter((p) => p.id !== stringId));
     } catch (error: any) {
       console.error("🔴 Ошибка утверждения:", error);
+
       let message = "Не удалось утвердить место. Попробуйте позже.";
       if (error.response) {
         const status = error.response.status;
         const data = error.response.data;
         console.log("Статус ответа:", status);
         console.log("Данные ошибки:", data);
+
         if (data?.message) {
           message = data.message;
         } else if (status === 401) {
@@ -215,11 +272,16 @@ const ModeratorPage = () => {
           message = "Место не найдено. Возможно, оно уже обработано.";
         } else if (status === 400) {
           message = "Неверный запрос. Проверьте данные.";
+        } else if (status === 403) {
+          message = "Недостаточно прав для этого действия.";
         }
       } else if (error.request) {
         message = "Сервер не отвечает. Проверьте соединение.";
       }
+
       alert(message);
+    } finally {
+      setProcessingId(null);
     }
   };
 

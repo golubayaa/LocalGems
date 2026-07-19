@@ -1,0 +1,58 @@
+services:
+  # Frontend (без Traefik, просто пробрасываем порт)
+  localgems-web:
+    image: goluboy/localgems-web:local  # ⚠️ Используем локальный образ
+    container_name: localgems-web-local
+    restart: unless-stopped
+    ports:
+      - "3000:80"  # Открываем на localhost:3000
+    networks:
+      - localgems-net
+    depends_on:
+      - localgems-api
+
+  # Backend
+  localgems-api:
+    image: goluboy/localgems-api:v1.0.0
+    container_name: localgems-api-local
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development  # ⚠️ Development вместо Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=localgems;Username=localgems;Password=localgems_secret
+    ports:
+      - "8080:8080"  # ⚠️ Открываем API напрямую для локального теста
+    networks:
+      - localgems-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Database
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: localgems-postgres-local
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=localgems
+      - POSTGRES_USER=localgems
+      - POSTGRES_PASSWORD=localgems_secret
+    ports:
+      - "5432:5432"  # ⚠️ Открываем для DBeaver/DataGrip
+    volumes:
+      - pgdata-local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U localgems"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - localgems-net
+
+volumes:
+  pgdata-local:
+
+networks:
+  localgems-net:
+    name: localgems-net
+    driver: bridge

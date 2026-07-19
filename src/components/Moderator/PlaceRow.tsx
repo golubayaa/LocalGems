@@ -3,12 +3,15 @@ import type { Place } from "../../data/mockPlaces";
 
 interface PlaceRowProps {
   place: Place;
-  onEdit: (id: number) => void;
-  onDelete: (id: number) => void;
-  onApprove?: (id: number) => void;
+  // ИЗМЕНЕНО: id теперь string (GUID), а не number
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+  onApprove?: (id: string) => void;
+  // НОВОЕ: состояние обработки для блокировки кнопок
+  isProcessing?: boolean;
 }
 
-const PlaceRow = ({ place, onEdit, onDelete, onApprove }: PlaceRowProps) => {
+const PlaceRow = ({ place, onEdit, onDelete, onApprove, isProcessing = false }: PlaceRowProps) => {
   const statusColors = {
     published: "text-green-600",
     moderation: "text-orange-500",
@@ -19,8 +22,11 @@ const PlaceRow = ({ place, onEdit, onDelete, onApprove }: PlaceRowProps) => {
     moderation: "⏳ На модерации",
   };
 
+  // ⬇Приводим ID к строке для единообразия
+  const placeId = String(place.id);
+
   return (
-    <tr className="hover:bg-gray-50 transition">
+    <tr className={`hover:bg-gray-50 transition ${isProcessing ? "opacity-50" : ""}`}>
       <td className="px-4 py-3 text-sm text-gray-900">{place.name}</td>
       <td className="px-4 py-3 text-sm text-gray-600">{place.category}</td>
       <td className="px-4 py-3 text-sm text-gray-600">{place.address}</td>
@@ -29,39 +35,42 @@ const PlaceRow = ({ place, onEdit, onDelete, onApprove }: PlaceRowProps) => {
       </td>
       <td className="px-4 py-3 text-sm">
         {place.status === "moderation" ? (
-          // Для модерации: Редактировать, Утвердить, Удалить
           <div className="grid grid-cols-3 gap-x-2 gap-y-1">
             <button
-              onClick={() => onEdit(place.id)}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800 transition text-left"
+              onClick={() => onEdit(placeId)}
+              disabled={isProcessing}
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Редактировать
             </button>
             <button
-              onClick={() => onApprove?.(place.id)}
-              className="text-sm font-medium text-green-600 hover:text-green-800 transition text-left"
+              onClick={() => onApprove?.(placeId)}
+              disabled={isProcessing}
+              className="text-sm font-medium text-green-600 hover:text-green-800 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Утвердить
+              {isProcessing ? "Обработка..." : "Утвердить"}
             </button>
             <button
-              onClick={() => onDelete(place.id)}
-              className="text-sm font-medium text-red-500 hover:text-red-700 transition text-left"
+              onClick={() => onDelete(placeId)}
+              disabled={isProcessing}
+              className="text-sm font-medium text-red-500 hover:text-red-700 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Удалить
+              {isProcessing ? "Обработка..." : "Удалить"}
             </button>
           </div>
         ) : (
-          // Для опубликованных: Редактировать, Удалить
           <div className="grid grid-cols-2 gap-x-2 gap-y-1">
             <button
-              onClick={() => onEdit(place.id)}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800 transition text-left"
+              onClick={() => onEdit(placeId)}
+              disabled={isProcessing}
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Редактировать
             </button>
             <button
-              onClick={() => onDelete(place.id)}
-              className="text-sm font-medium text-red-500 hover:text-red-700 transition text-left"
+              onClick={() => onDelete(placeId)}
+              disabled={isProcessing}
+              className="text-sm font-medium text-red-500 hover:text-red-700 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Удалить
             </button>
