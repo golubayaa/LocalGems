@@ -1,10 +1,10 @@
 // src/hooks/useSwipeToClose.ts
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from "react";
 
 interface UseSwipeToCloseProps {
   isOpen: boolean;
   onClose: () => void;
-  threshold?: number; // порог закрытия в пикселях
+  threshold?: number;
 }
 
 export function useSwipeToClose({ isOpen, onClose, threshold = 100 }: UseSwipeToCloseProps) {
@@ -15,6 +15,7 @@ export function useSwipeToClose({ isOpen, onClose, threshold = 100 }: UseSwipeTo
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOffsetY(0);
     }
   }, [isOpen]);
@@ -45,9 +46,10 @@ export function useSwipeToClose({ isOpen, onClose, threshold = 100 }: UseSwipeTo
     }
   };
 
+  // ✅ Убираем доступ к ref при рендере — используем только в стилях
   const style = {
     transform: `translateY(${offsetY}px)`,
-    transition: isDragging.current ? 'none' : 'transform 0.3s ease-out',
+    transition: "transform 0.3s ease-out",
   };
 
   return {

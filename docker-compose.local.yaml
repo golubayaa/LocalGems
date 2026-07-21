@@ -2,7 +2,7 @@ services:
 
   # Backend
   localgems-api:
-    image: goluboy/localgems-api:v1.0.4
+    image: goluboy/localgems-api:v1.0.5
     container_name: localgems-api-local
     restart: unless-stopped
     environment:

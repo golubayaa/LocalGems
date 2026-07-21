@@ -1,5 +1,5 @@
 // src/components/Map/AddPlaceModal.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { categories, categoryToEnumMap } from "../../data/categories";
 import InputField from "../Form/InputField";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
@@ -60,21 +60,21 @@ const AddPlaceModal = ({ isOpen, onClose }: AddPlaceModalProps) => {
     };
   }, [isOpen]);
 
-  const handleClose = () => {
-    setFormData({
-      name: "",
-      category: "",
-      address: "",
-      coordinates: "",
-      description: "",
-    });
-    setErrors({ name: "", category: "", address: "" });
-    setUploadedFiles([]);
-    setIsSelecting(false);
-    window.isSelectingCoords = false;
-    clearSuggest();
-    onClose();
-  };
+  const handleClose = useCallback(() => {
+  setFormData({
+    name: "",
+    category: "",
+    address: "",
+    coordinates: "",
+    description: "",
+  });
+  setErrors({ name: "", category: "", address: "" });
+  setUploadedFiles([]);
+  setIsSelecting(false);
+  window.isSelectingCoords = false;
+  clearSuggest();
+  onClose();
+}, [clearSuggest, onClose]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

@@ -17,7 +17,6 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
   const isMobile = !useMediaQuery("(min-width: 768px)");
   const [formData, setFormData] = useState<Place | null>(place);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
 

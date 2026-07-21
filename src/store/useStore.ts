@@ -211,6 +211,7 @@ export const useStore = create<Store>()(
         isModerator: state.isModerator,
         userEmail: state.userEmail,
         token: state.token,
+        route: state.route,
       }),
     }
   )

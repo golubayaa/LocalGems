@@ -1,5 +1,7 @@
+// src/api/wishlist.ts
 import { apiClient } from "./client";
 import type { Place } from "../data/mockPlaces";
+import { categories } from "../data/categories"; // ⬅️ добавляем импорт
 
 const isGuidLike = (value: unknown): value is string => {
   return typeof value === "string" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value.trim());
@@ -15,7 +17,6 @@ const normalizeWishlistPayload = (payload: unknown): unknown[] => {
     const items = Array.isArray(record.items) ? record.items : Array.isArray(record.places) ? record.places : [];
     return items;
   }
-
   return [];
 };
 
@@ -23,22 +24,18 @@ const normalizePhotoUrl = (value: unknown): string | undefined => {
   if (typeof value !== "string") {
     return undefined;
   }
-
   const trimmed = value.trim().replace(/^['"]|['"]$/g, "");
   if (!trimmed) {
     return undefined;
   }
-
   const withProtocol = trimmed.startsWith("http://")
     ? trimmed.replace(/^http:\/\//, "https://")
     : trimmed.startsWith("https://") || trimmed.startsWith("//")
       ? trimmed.startsWith("//") ? `https:${trimmed}` : trimmed
       : `https://${trimmed}`;
-
   if (withProtocol.includes("images.unsplash.com")) {
     return withProtocol.split("?")[0];
   }
-
   return withProtocol;
 };
 
@@ -48,9 +45,7 @@ const extractPhotoUrl = (item: Record<string, unknown>): string | undefined => {
 
   while (stack.length > 0) {
     const current = stack.pop();
-    if (!current) {
-      continue;
-    }
+    if (!current) continue;
 
     const { value, path } = current;
 
@@ -73,19 +68,27 @@ const extractPhotoUrl = (item: Record<string, unknown>): string | undefined => {
     }
 
     if (value && typeof value === "object") {
-      if (seen.has(value)) {
-        continue;
-      }
+      if (seen.has(value)) continue;
       seen.add(value);
-
       const record = value as Record<string, unknown>;
       for (const [key, child] of Object.entries(record).reverse()) {
         stack.push({ value: child, path: [...path, key] });
       }
     }
   }
-
   return undefined;
+};
+
+// ⬇️ Функция для преобразования числовой категории в название
+const mapCategoryCodeToLabel = (category: unknown): string => {
+  if (typeof category === "number") {
+    return categories[category] ?? "Неизвестно";
+  }
+  if (typeof category === "string") {
+    // Если уже строка — возвращаем как есть (на случай, если бекенд поменяется)
+    return category;
+  }
+  return "Неизвестно";
 };
 
 const mapWishlistItem = (item: Record<string, unknown>): Place => {
@@ -104,11 +107,14 @@ const mapWishlistItem = (item: Record<string, unknown>): Place => {
   const longitude = Number(payload.longitude ?? payload.lng ?? item.longitude ?? item.lng ?? 60.6057);
   const photoUrl = extractPhotoUrl(payload);
 
+  // ⬇️ Преобразуем категорию
+  const category = mapCategoryCodeToLabel(payload.category ?? item.category);
+
   return {
     id: placeId,
     guid,
     name: String(payload.name ?? item.name ?? "Без названия"),
-    category: String(payload.category ?? item.category ?? "Неизвестно"),
+    category, // <-- теперь здесь будет название, а не число
     address: String(payload.address ?? payload.location ?? item.address ?? item.location ?? "Адрес не указан"),
     status: "published",
     lat: Number.isFinite(latitude) ? latitude : 56.8389,

@@ -337,6 +337,10 @@ export const placesApi = {
     const response = await apiClient.post(`/moderation/suggestions/${id}/reject`, { comment });
     return response.data;
   },
+
+  deletePlace: async (id: string): Promise<void> => {
+    await apiClient.delete(`/places/${id}`);
+  },
 };
 
 export { mapCategoryCodeToLabel };

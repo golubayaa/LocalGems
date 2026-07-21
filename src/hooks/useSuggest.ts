@@ -6,6 +6,27 @@ interface SuggestItem {
   coordinates?: [number, number];
 }
 
+// Тип для ответа от геокодера
+interface GeocoderResponse {
+  response?: {
+    GeoObjectCollection?: {
+      featureMember?: Array<{
+        GeoObject: {
+          metaDataProperty?: {
+            GeocoderMetaData?: {
+              text?: string;
+            };
+          };
+          name?: string;
+          Point?: {
+            pos?: string;
+          };
+        };
+      }>;
+    };
+  };
+}
+
 export function useSuggest() {
   const [items, setItems] = useState<SuggestItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,13 +55,18 @@ export function useSuggest() {
       const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${apiKey}&geocode=${encodeURIComponent(query)}&format=json&results=5`;
 
       const response = await fetch(url, { signal: controller.signal });
-      const data = await response.json();
+      const data = (await response.json()) as GeocoderResponse;
 
       const featureMembers = data?.response?.GeoObjectCollection?.featureMember || [];
-      const suggestions = featureMembers.map((member: any) => {
+      const suggestions = featureMembers.map((member) => {
         const geoObject = member.GeoObject;
         const address = geoObject?.metaDataProperty?.GeocoderMetaData?.text || geoObject?.name || "";
-        const coordinates = geoObject?.Point?.pos?.split(" ").map(Number).reverse() as [number, number];
+        const pos = geoObject?.Point?.pos;
+        let coordinates: [number, number] | undefined;
+        if (pos) {
+          const [lng, lat] = pos.split(" ").map(Number);
+          coordinates = [lat, lng];
+        }
         return { value: address, coordinates };
       });
 

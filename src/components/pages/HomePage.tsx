@@ -81,7 +81,7 @@ const HomePage = () => {
   });
 
   return (
-    <div className="flex w-full h-[calc(100vh-64px)]">
+    <div className="flex w-full h-[calc(100vh-64px)] overflow-hidden">
       {!isMobile && (
         <LeftPanel
           selectedCategories={selectedCategories}
@@ -94,7 +94,7 @@ const HomePage = () => {
         />
       )}
 
-      <main className="flex-1 relative">
+      <main className="flex-1 relative overflow-hidden">
         <Map places={filteredPlaces} center={mapCenter} />
         <AddPlaceModal
           isOpen={isAddModalOpen}

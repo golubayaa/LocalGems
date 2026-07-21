@@ -4,6 +4,7 @@ import { YMaps, Map as YandexMap, Placemark } from "@pbe/react-yandex-maps";
 import { type Place } from "../../data/mockPlaces";
 import { useStore } from "../../store/useStore";
 import PlaceDetailsModal from "./PlaceDetailsModal";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 
 declare global {
   interface Window {
@@ -46,6 +47,8 @@ interface MapProps {
 }
 
 const Map = ({ className = "", places, center }: MapProps) => {
+  const isMobile = !useMediaQuery("(min-width: 768px)");
+
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { addToRoute, removeFromRoute, route } = useStore();
@@ -57,28 +60,34 @@ const Map = ({ className = "", places, center }: MapProps) => {
   const [popupPosition, setPopupPosition] = useState<{ x: number; y: number } | null>(null);
 
   const hideTimerRef = useRef<number | null>(null);
-  const mapInstanceRef = useRef<unknown>(null);
+  const mapInstanceRef = useRef<{ setCenter?: (center: [number, number]) => void } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const defaultCenter: [number, number] = [56.8389, 60.6057];
   const mapCenter = center || defaultCenter;
 
-  const handleMapLoad = useCallback((ymaps: unknown) => {
-    const maybeMap = ymaps as { map?: unknown };
-    if (maybeMap && maybeMap.map) {
-      mapInstanceRef.current = maybeMap.map;
-    } else if (ymaps) {
-      mapInstanceRef.current = ymaps;
-    }
+  const handleMapInstance = useCallback((instance: { setCenter?: (center: [number, number]) => void } | null) => {
+  if (instance) {
+    mapInstanceRef.current = instance;
+  }
   }, []);
 
   useEffect(() => {
     if (!center) return;
-    if (!mapInstanceRef.current) return;
-    const map = mapInstanceRef.current as { setCenter?: (center: [number, number]) => void };
-    if (typeof map.setCenter === "function") {
-      map.setCenter(center);
-    }
+    
+    const applyCenter = () => {
+      const map = mapInstanceRef.current;
+      if (!map) {
+        setTimeout(applyCenter, 500);
+        return;
+      }
+      
+      if (typeof map.setCenter === "function") {
+        map.setCenter(center);
+      }
+    };
+    
+    applyCenter();
   }, [center]);
 
   useEffect(() => {
@@ -270,7 +279,7 @@ const Map = ({ className = "", places, center }: MapProps) => {
   const isHoveredInRoute = hoveredPlace ? route.some((p) => p.id === hoveredPlace.id) : false;
 
   return (
-    <div className={`h-full w-full relative ${className}`} ref={containerRef}>
+    <div className={`h-full w-full relative overflow-hidden ${className}`} ref={containerRef}>
       <YMaps
         query={{
           apikey: "2ccd62a3-8204-4560-9c6d-128722d4d938",
@@ -281,16 +290,15 @@ const Map = ({ className = "", places, center }: MapProps) => {
           defaultState={{ center: mapCenter, zoom: 13 }}
           width="100%"
           height="100%"
-          onLoad={handleMapLoad}
           onClick={handleMapClick}
+          instanceRef={handleMapInstance}
         >
           {markers}
           {selectingMarker}
         </YandexMap>
       </YMaps>
 
-      {/* Попап при наведении */}
-      {hoveredPlace && popupPosition && (
+      {!isMobile && hoveredPlace && popupPosition && (
         <div
           className="fixed bg-white rounded-lg shadow-lg p-3 z-50 max-w-[240px] pointer-events-auto"
           style={{
@@ -324,7 +332,6 @@ const Map = ({ className = "", places, center }: MapProps) => {
         </div>
       )}
 
-      {/* Кнопка подтверждения выбора координат */}
       {isSelecting && (
         <button
           className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 bg-green-500 text-white font-medium rounded-lg shadow-lg hover:bg-green-600 transition disabled:opacity-50"

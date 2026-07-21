@@ -75,12 +75,17 @@ const RoutePanel = ({ isOpen, onClose }: RoutePanelProps) => {
         onTouchEnd={handleTouchEnd}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Ручка */}
-        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
-        </div>
+        {isMobile && (
+          <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+            <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          </div>
+        )}
 
-        <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-200 flex-shrink-0">
+        <div
+          className={`flex items-center justify-between px-4 border-b border-gray-200 flex-shrink-0 ${
+            isMobile ? "pb-3 pt-0" : "pb-3 pt-4"
+          }`}
+        >
           <h2 className="text-xl font-bold text-gray-900">Мой маршрут</h2>
           <button
             onClick={onClose}

@@ -198,6 +198,7 @@ const ModeratorPage = () => {
           ? "Не удалось отклонить предложение. Попробуйте позже."
           : "Не удалось удалить место. Попробуйте позже.";
         alert(message);
+        console.error("Delete error:", error);
       } finally {
         setProcessingId(null);
       }
@@ -212,6 +213,7 @@ const ModeratorPage = () => {
       await refreshData();
     } catch (error) {
       alert("Не удалось утвердить место. Попробуйте позже.");
+      console.error("Approve error:", error);
     } finally {
       setProcessingId(null);
     }
@@ -226,7 +228,6 @@ const ModeratorPage = () => {
       String(p.id) === String(updatedPlace.id) ? updatedPlace : p
     );
     setModerationPlaces(updatedModeration);
-    // Обновляем глобальный список для карты
     setPlaces(updatedAll);
   };
 

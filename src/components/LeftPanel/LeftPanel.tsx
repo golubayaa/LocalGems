@@ -9,7 +9,6 @@ interface LeftPanelProps {
   onSetCenter: (lat: number, lng: number) => void;
 }
 
-// Расширяем Window для глобальной функции
 declare global {
   interface Window {
     openRoutePanel?: () => void;
@@ -30,13 +29,27 @@ const LeftPanel = ({
       alert("Геолокация не поддерживается вашим браузером");
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
         onSetCenter(latitude, longitude);
       },
-      () => {
-        alert("Не удалось определить ваше местоположение");
+      (err) => {
+        let message = "Не удалось определить ваше местоположение";
+        if (err.code === 1) {
+          message = "Пользователь запретил доступ к геолокации";
+        } else if (err.code === 2) {
+          message = "Нет сигнала GPS или недоступны датчики";
+        } else if (err.code === 3) {
+          message = "Таймаут получения координат. Попробуйте позже.";
+        }
+        alert(message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
       }
     );
   };
@@ -48,7 +61,7 @@ const LeftPanel = ({
   };
 
   return (
-    <aside className="w-[300px] h-full bg-white shadow-md overflow-y-auto p-4 flex flex-col gap-4">
+    <aside className="w-[300px] min-w-[300px] max-w-[300px] h-full bg-white shadow-md overflow-y-auto p-4 flex flex-col gap-4 flex-shrink-0">
       <h2 className="text-xl font-bold text-gray-900">Категории</h2>
 
       <div className="flex flex-col gap-2">
