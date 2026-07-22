@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../../store/useStore";
 import type { Place } from "../../data/mockPlaces";
-import { Check } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PlaceDetailsModalProps {
   place: Place | null;
@@ -15,6 +15,7 @@ const PlaceDetailsModal = ({ place, isOpen, onClose }: PlaceDetailsModalProps) =
   const { favorites, route, isAuth, addFavorite, removeFavorite, addToRoute, removeFromRoute } = useStore();
   const [shareMessage, setShareMessage] = useState("Поделиться");
   const [imageError, setImageError] = useState(false);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -30,29 +31,24 @@ const PlaceDetailsModal = ({ place, isOpen, onClose }: PlaceDetailsModalProps) =
     if (!isOpen) {
       setShareMessage("Поделиться");
       setImageError(false);
+      setCurrentPhotoIndex(0);
     }
   }, [isOpen]);
 
   useEffect(() => {
     setImageError(false);
-  }, [place?.photoUrl]);
+    setCurrentPhotoIndex(0);
+  }, [place?.id]);
 
   if (!isOpen || !place) return null;
 
-  const normalizedPhotoUrl = (() => {
-    if (!place.photoUrl) return undefined;
-    const trimmed = place.photoUrl.trim().replace(/^['"]|['"]$/g, "");
-    if (!trimmed) return undefined;
-    const withProtocol = trimmed.startsWith("http://")
-      ? trimmed.replace(/^http:\/\//, "https://")
-      : trimmed.startsWith("https://") || trimmed.startsWith("//")
-        ? trimmed.startsWith("//") ? `https:${trimmed}` : trimmed
-        : `https://${trimmed}`;
-    if (withProtocol.includes("images.unsplash.com") && !withProtocol.includes("?")) {
-      return `${withProtocol}?auto=format&fit=crop&w=800&q=80`;
-    }
-    return withProtocol;
-  })();
+  const allPhotos = place.photos && place.photos.length > 0
+    ? place.photos
+    : place.photoUrl
+      ? [place.photoUrl]
+      : [];
+
+  const currentPhoto = allPhotos[currentPhotoIndex] || null;
 
   const isFavorite = favorites.some((p) => p.id === place.id);
   const isInRoute = route.some((p) => p.id === place.id);
@@ -92,6 +88,14 @@ const PlaceDetailsModal = ({ place, isOpen, onClose }: PlaceDetailsModalProps) =
     }
   };
 
+  const goToPrevious = () => {
+    setCurrentPhotoIndex((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentPhotoIndex((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0));
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -101,29 +105,64 @@ const PlaceDetailsModal = ({ place, isOpen, onClose }: PlaceDetailsModalProps) =
         className="bg-white rounded-2xl shadow-xl w-[640px] max-h-[90vh] overflow-y-auto p-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-end p-4">
+        {/* Фото — объект-cover, без искажений, без полос */}
+        <div className="relative w-full h-64 bg-gray-100 overflow-hidden">
           <button
             onClick={onClose}
-            className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition"
+            className="absolute top-4 right-4 w-8 h-8 bg-white/80 rounded-full flex items-center justify-center hover:bg-white transition z-10"
           >
             ✕
           </button>
-        </div>
 
-        <div className="w-full h-48 bg-gray-200">
-          {normalizedPhotoUrl && !imageError ? (
+          {currentPhoto && !imageError ? (
             <img
-              src={normalizedPhotoUrl}
+              src={currentPhoto}
               alt={place.name}
               className="w-full h-full object-cover"
-              onError={() => setImageError(true)}
+              onError={() => {
+                setImageError(true);
+              }}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
+            <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
               Фото отсутствует
             </div>
           )}
+
+          {allPhotos.length > 1 && (
+            <>
+              <button
+                onClick={goToPrevious}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/70 rounded-full flex items-center justify-center hover:bg-white transition z-10"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-800" />
+              </button>
+              <button
+                onClick={goToNext}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/70 rounded-full flex items-center justify-center hover:bg-white transition z-10"
+              >
+                <ChevronRight className="w-5 h-5 text-gray-800" />
+              </button>
+            </>
+          )}
         </div>
+
+        {/* Миниатюры */}
+        {allPhotos.length > 1 && (
+          <div className="flex gap-1 p-2 overflow-x-auto bg-white border-b border-gray-100">
+            {allPhotos.map((photo, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentPhotoIndex(idx)}
+                className={`flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition ${
+                  idx === currentPhotoIndex ? "border-blue-600" : "border-transparent hover:border-gray-300"
+                }`}
+              >
+                <img src={photo} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="p-6 space-y-4">
           <h2 className="text-2xl font-bold text-gray-900">{place.name}</h2>

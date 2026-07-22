@@ -85,10 +85,6 @@ const normalizePhotoUrl = (value: unknown): string | undefined => {
       ? trimmed.startsWith("//") ? `https:${trimmed}` : trimmed
       : `https://${trimmed}`;
 
-  if (withProtocol.includes("images.unsplash.com")) {
-    return withProtocol.split("?")[0];
-  }
-
   return withProtocol;
 };
 
@@ -141,14 +137,22 @@ const extractPhotoUrl = (item: Record<string, unknown>): string | undefined => {
 const mapBackendPlace = (item: Record<string, unknown>): Place => {
   const latitude = Number(item.latitude ?? item.lat ?? 56.8389);
   const longitude = Number(item.longitude ?? item.lng ?? 60.6057);
-  const rawId = item.id ?? item.Id ?? item.placeId ?? item.PlaceId ?? item.guid ?? item.Guid;
+  const rawId = item.id ?? item.placeId ?? item.guid;
   const placeId = typeof rawId === "number"
     ? rawId
     : typeof rawId === "string"
       ? rawId.trim()
       : "";
   const guid = typeof placeId === "string" && isGuidLike(placeId) ? placeId : undefined;
+
   const photoUrl = extractPhotoUrl(item);
+
+  // ✅ Массив всех фото
+  let photos: string[] = [];
+  const rawPhotos = item.photos ?? item.photoUrls ?? item.PhotoUrls;
+  if (Array.isArray(rawPhotos)) {
+    photos = rawPhotos.map((url) => normalizePhotoUrl(url)).filter(Boolean) as string[];
+  }
 
   return {
     id: placeId,
@@ -162,6 +166,7 @@ const mapBackendPlace = (item: Record<string, unknown>): Place => {
     lng: Number.isFinite(longitude) ? longitude : 60.6057,
     description: typeof item.description === "string" ? item.description : undefined,
     photoUrl,
+    photos,
   };
 };
 
@@ -181,11 +186,9 @@ const normalizePlacesPayload = (payload: unknown): Place[] => {
 };
 
 export const storageApi = {
-  // Загрузка одного файла
   uploadFile: async (file: File, folder: string = 'suggestions'): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
-    
     const response = await apiClient.post<{ url: string }>(
       `/storage/upload?folder=${folder}`,
       formData,
@@ -195,15 +198,12 @@ export const storageApi = {
         },
       }
     );
-    
     return response.data.url;
   },
 
-  // Загрузка нескольких файлов
   uploadMultipleFiles: async (files: File[], folder: string = 'suggestions'): Promise<string[]> => {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
-    
     const response = await apiClient.post<{ urls: string[] }>(
       `/storage/upload-multiple?folder=${folder}`,
       formData,
@@ -213,7 +213,6 @@ export const storageApi = {
         },
       }
     );
-    
     return response.data.urls;
   },
 };
@@ -271,31 +270,26 @@ export const placesApi = {
 
   createSuggestion: async (payload: CreateSuggestionFormData): Promise<Place> => {
     let photoUrls: string[] = [];
-    
-    // 1. Загружаем фото (если есть)
+
     if (payload.photos && payload.photos.length > 0) {
       try {
         photoUrls = await storageApi.uploadMultipleFiles(payload.photos, 'suggestions');
       } catch (error) {
         console.error('Failed to upload photos:', error);
-        // Продолжаем без фото или выбрасываем ошибку
-        // throw new Error('Photo upload failed');
       }
     }
 
-    // 2. Создаём FormData для отправки предложения
     const formData = new FormData();
     formData.append('name', payload.name);
     formData.append('description', payload.description ?? '');
     formData.append('category', payload.category.toString());
     formData.append('latitude', payload.latitude.toString());
     formData.append('longitude', payload.longitude.toString());
-    
+
     if (payload.tags && payload.tags.length > 0) {
       formData.append('tags', JSON.stringify(payload.tags));
     }
-    
-    // 3. Добавляем URL фото (первое как основное)
+
     if (photoUrls.length > 0) {
       formData.append('photoUrl', photoUrls[0]);
       if (photoUrls.length > 1) {
@@ -303,7 +297,6 @@ export const placesApi = {
       }
     }
 
-    // 4. Отправляем на сервер
     const response = await apiClient.post<Record<string, unknown>>(
       '/suggestions',
       formData,

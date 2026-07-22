@@ -15,7 +15,7 @@ const MobilePlaceCard = ({ place, onEdit, onDelete, onApprove, isProcessing = fa
 
   return (
     <div className={`bg-white rounded-lg shadow p-4 flex flex-col gap-2 ${isProcessing ? "opacity-50" : ""}`}>
-      <div className="flex justify-between items-start">
+      <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 text-base truncate">{place.name}</h3>
           <p className="text-sm text-gray-600 truncate">{place.category}</p>

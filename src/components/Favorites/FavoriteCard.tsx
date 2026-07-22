@@ -18,7 +18,16 @@ const FavoriteCard = ({
 }: FavoriteCardProps) => {
   return (
     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-      <div className="w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0" />
+      {/* Фото */}
+      {place.photoUrl ? (
+        <img
+          src={place.photoUrl}
+          alt={place.name}
+          className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+        />
+      ) : (
+        <div className="w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0" />
+      )}
 
       <div className="flex-1 min-w-0">
         <h4 className="text-sm font-semibold text-gray-900 truncate">

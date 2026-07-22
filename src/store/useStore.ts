@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { authApi } from "../api/auth";
 import { placesApi, type CreateSuggestionPayload } from "../api/places";
 import { wishlistApi } from "../api/wishlist";
+import { routesApi } from "../api/routes";
 import { type Place } from "../data/mockPlaces";
 
 interface Store {
@@ -14,6 +15,7 @@ interface Store {
   isModerator: boolean;
   userEmail: string;
   token: string | null;
+  currentRouteId: string | null;
   addFavorite: (place: Place) => Promise<void>;
   removeFavorite: (id: number | string) => Promise<void>;
   addToRoute: (place: Place) => void;
@@ -25,6 +27,8 @@ interface Store {
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loadFavorites: () => Promise<void>;
+  loadRoute: () => Promise<void>;
+  syncRouteWithServer: () => Promise<void>;
 }
 
 export const useStore = create<Store>()(
@@ -37,9 +41,8 @@ export const useStore = create<Store>()(
       isModerator: false,
       userEmail: "",
       token: null,
+      currentRouteId: null,
 
-      // ... все методы без изменений ...
-      
       addFavorite: async (place) => {
         const existing = get().favorites.some((p) => p.id === place.id);
         if (existing) return;
@@ -79,19 +82,26 @@ export const useStore = create<Store>()(
         }
       },
 
-      addToRoute: (place) =>
+      addToRoute: (place) => {
         set((state) => ({
           route: state.route.some((p) => p.id === place.id)
             ? state.route
             : [...state.route, place],
-        })),
+        }));
+        get().syncRouteWithServer();
+      },
 
-      removeFromRoute: (id) =>
+      removeFromRoute: (id) => {
         set((state) => ({
           route: state.route.filter((p) => p.id !== id),
-        })),
+        }));
+        get().syncRouteWithServer();
+      },
 
-      clearRoute: () => set({ route: [] }),
+      clearRoute: () => {
+        set({ route: [] });
+        get().syncRouteWithServer();
+      },
 
       setPlaces: (places) => set({ places }),
 
@@ -107,19 +117,16 @@ export const useStore = create<Store>()(
             tags: placeData.tags ?? [],
             photos: placeData.photos ?? [],
           });
-          
           console.log("Место успешно создано:", createdPlace);
         } catch (error) {
           console.error("Ошибка при создании места:", error);
           throw error;
-        }        
+        }
       },
 
       loadFavorites: async () => {
         if (!get().isAuth) {
-          // ⭐ Для гостей не очищаем favorites — они могут быть из localStorage
           if (!get().token) {
-            // Гость — ничего не делаем, favorites остаются как есть
             return;
           }
           set({ favorites: [] });
@@ -131,7 +138,69 @@ export const useStore = create<Store>()(
           set({ favorites });
         } catch (error) {
           console.error("Не удалось загрузить избранное из backend", error);
-          // ⭐ Не очищаем favorites при ошибке — пусть остаются старые
+        }
+      },
+
+      loadRoute: async () => {
+        if (!get().isAuth) {
+          set({ route: [], currentRouteId: null });
+          return;
+        }
+
+        try {
+          const routes = await routesApi.list();
+          if (routes.length > 0) {
+            const firstRoute = routes[0];
+            const placeIds = firstRoute.waypoints.map((wp) => wp.placeId);
+            
+            const places = await Promise.all(
+              placeIds
+                .filter((id): id is string => id !== null && id !== undefined && id !== "")
+                .map((id) => placesApi.getById(id))
+            );
+            
+            set({ 
+              route: places, 
+              currentRouteId: firstRoute.id 
+            });
+          } else {
+            const newRoute = await routesApi.create("Мой маршрут");
+            set({ 
+              route: [], 
+              currentRouteId: newRoute.id 
+            });
+          }
+        } catch (error) {
+          console.error("Failed to load route", error);
+          set({ route: [], currentRouteId: null });
+        }
+      },
+
+      syncRouteWithServer: async () => {
+        const routeId = get().currentRouteId;
+        if (!get().isAuth || !routeId) return;
+
+        try {
+          const currentPlaces = get().route;
+          
+          const serverRoute = await routesApi.getById(routeId);
+          const serverPlaceIds = serverRoute.waypoints.map((wp) => wp.placeId);
+          const localPlaceIds = currentPlaces.map((p) => String(p.id));
+
+          for (const place of currentPlaces) {
+            const placeId = String(place.id);
+            if (!serverPlaceIds.includes(placeId)) {
+              await routesApi.addWaypoint(routeId, placeId);
+            }
+          }
+
+          for (const wp of serverRoute.waypoints) {
+            if (!localPlaceIds.includes(wp.placeId)) {
+              await routesApi.removeWaypoint(routeId, wp.placeId);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to sync route with server", error);
         }
       },
 
@@ -159,7 +228,9 @@ export const useStore = create<Store>()(
           token,
         });
         localStorage.setItem("authToken", token);
+        
         await get().loadFavorites();
+        await get().loadRoute();
       },
 
       register: async (email: string, password: string) => {
@@ -190,7 +261,9 @@ export const useStore = create<Store>()(
           token,
         });
         localStorage.setItem("authToken", token);
+        
         await get().loadFavorites();
+        await get().loadRoute();
       },
 
       logout: () => {
@@ -200,41 +273,36 @@ export const useStore = create<Store>()(
           userEmail: "",
           token: null,
           favorites: [],
-          // ⭐ Опционально: очищать ли маршрут при logout?
-          // route: [],  // Раскомментируй, если нужно
+          route: [],
+          currentRouteId: null,
         });
         localStorage.removeItem("authToken");
       },
     }),
     {
-      name: "localgems-store",  // ⭐ Переименовал (было "localgems-auth")
-      version: 1,               // ⭐ Версия для миграций
+      name: "localgems-store",
+      version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Аутентификация
         isAuth: state.isAuth,
         isModerator: state.isModerator,
         userEmail: state.userEmail,
         token: state.token,
-        
-        // ⭐ ДОБАВЛЕНО: маршрут сохраняется в localStorage
         route: state.route,
-        
-        // Опционально: избранное для гостей
-        // favorites: state.favorites,
+        currentRouteId: state.currentRouteId,
       }),
-      // ⭐ Защита от breaking changes в будущем
-      migrate: (persistedState: any, version: number) => {
+
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Record<string, unknown>;
         if (version === 0) {
-          // Если был переход с v0 → v1
           return {
-            ...persistedState,
-            route: persistedState.route ?? [],
+            ...state,
+            route: (state.route as Place[]) ?? [],
+            currentRouteId: null,
           };
         }
-        return persistedState;
+        return state;
       },
-      // ⭐ Обработка ошибок при чтении из localStorage
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.error("Failed to rehydrate store:", error);

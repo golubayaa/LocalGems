@@ -11,7 +11,7 @@ export interface Place {
   lng: number;
   description?: string;
   photoUrl?: string;
-  photos?: string[]; 
+  photos?: string[];
 }
 
 export const mockPlaces: Place[] = [

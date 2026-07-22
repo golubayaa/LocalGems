@@ -12,6 +12,7 @@ declare global {
     openFavoritesPanel?: () => void;
     openRoutePanel?: () => void;
     toggleMobileMenu?: () => void;
+    centerMapOnEkaterinburg?: () => void;
   }
 }
 
@@ -51,6 +52,15 @@ const Header = () => {
     }
   };
 
+  // Обработчик клика по логотипу — центрирует карту на Екатеринбурге на всех устройствах
+  const handleLogoClick = () => {
+    if (window.centerMapOnEkaterinburg) {
+      window.centerMapOnEkaterinburg();
+    } else {
+      navigate("/");
+    }
+  };
+
   return (
     <>
       <header className="h-16 bg-white border-b border-gray-200 shadow-sm px-4 sm:px-6 flex items-center justify-between relative z-50">
@@ -69,7 +79,7 @@ const Header = () => {
         <div className="flex-1 md:flex-none flex justify-center md:justify-start">
           <span
             className="text-xl sm:text-2xl font-bold text-blue-600 cursor-pointer"
-            onClick={() => navigate("/")}
+            onClick={handleLogoClick}
           >
             LocalGems
           </span>

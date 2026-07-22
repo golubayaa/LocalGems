@@ -5,6 +5,7 @@ import type { Place } from "../../data/mockPlaces";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useSwipeToClose } from "../../hooks/useSwipeToClose";
 import { useSuggest } from "../../hooks/useSuggest";
+import { storageApi } from "../../api/places";
 
 interface EditPlaceModalProps {
   place: Place | null;
@@ -15,18 +16,19 @@ interface EditPlaceModalProps {
 
 const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps) => {
   const isMobile = !useMediaQuery("(min-width: 768px)");
-  const [formData, setFormData] = useState<Place | null>(place);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const addressInputRef = useRef<HTMLInputElement>(null);
-
-  const { items, isOpen: isSuggestOpen, setIsOpen: setIsSuggestOpen, fetchSuggest, clearSuggest } = useSuggest();
-
   const { panelRef, handleTouchStart, handleTouchMove, handleTouchEnd, style } = useSwipeToClose({
     isOpen,
     onClose,
     threshold: 80,
   });
+
+  const { items, isOpen: isSuggestOpen, setIsOpen: setIsSuggestOpen, fetchSuggest, clearSuggest } = useSuggest();
+
+  const [formData, setFormData] = useState<Place | null>(place);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addressInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -85,11 +87,43 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
     addressInputRef.current?.blur();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData) {
-      onSave(formData);
+    if (!formData) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // ✅ Загружаем новые фото
+      let newPhotoUrls: string[] = [];
+      if (uploadedFiles.length > 0) {
+        try {
+          newPhotoUrls = await storageApi.uploadMultipleFiles(uploadedFiles, 'suggestions');
+        } catch (error) {
+          console.error('Failed to upload photos:', error);
+        }
+      }
+
+      // ✅ Собираем все фото: старые + новые
+      const existingPhotos = formData.photos || [];
+      const existingPhotoUrl = formData.photoUrl ? [formData.photoUrl] : [];
+      const allPhotos = [...existingPhotos, ...existingPhotoUrl, ...newPhotoUrls];
+
+      // ✅ Убираем дубликаты
+      const uniquePhotos = Array.from(new Set(allPhotos));
+
+      const updatedPlace = {
+        ...formData,
+        photos: uniquePhotos,
+        photoUrl: uniquePhotos.length > 0 ? uniquePhotos[0] : formData.photoUrl,
+      };
+
+      onSave(updatedPlace);
       onClose();
+    } catch (error) {
+      console.error('Error saving place:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -108,7 +142,7 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
   };
 
   const triggerFileInput = () => {
-    fileInputRef.current?.click();
+    if (!isSubmitting) fileInputRef.current?.click();
   };
 
   const openMapInNewTab = () => {
@@ -117,6 +151,13 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
       window.open(url, "_blank");
     }
   };
+
+  // ✅ Фото для отображения
+  const existingPhotos = (formData?.photos && formData.photos.length > 0)
+    ? formData.photos
+    : formData?.photoUrl
+      ? [formData.photoUrl]
+      : [];
 
   // Десктопная версия
   if (!isMobile) {
@@ -129,11 +170,19 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
           className="bg-white rounded-2xl shadow-xl w-[560px] max-h-[95vh] overflow-y-auto p-6"
           onClick={(e) => e.stopPropagation()}
         >
+          {isSubmitting && (
+            <div className="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center rounded-2xl">
+              <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-3" />
+              <p className="text-gray-700 font-medium">Сохранение...</p>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">Редактирование места</h2>
             <button
               onClick={onClose}
-              className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition"
+              disabled={isSubmitting}
+              className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition disabled:opacity-50"
             >
               ✕
             </button>
@@ -149,6 +198,7 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                 onChange={handleChange}
                 className="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -160,6 +210,7 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                 onChange={handleChange}
                 className="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                disabled={isSubmitting}
               >
                 <option value="Кафе">Кафе</option>
                 <option value="Рестораны">Рестораны</option>
@@ -188,6 +239,7 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                   placeholder="Введите адрес"
                   className="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
+                  disabled={isSubmitting}
                 />
                 {isSuggestOpen && items.length > 0 && (
                   <ul className="absolute top-full left-0 w-full z-20 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
@@ -223,11 +275,13 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                   }}
                   className="flex-1 h-9 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="56.8389, 60.6057"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   onClick={openMapInNewTab}
-                  className="h-9 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
+                  disabled={isSubmitting}
+                  className="h-9 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition whitespace-nowrap disabled:opacity-50"
                 >
                   Показать на карте
                 </button>
@@ -241,34 +295,50 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                 value={formData.description || ""}
                 onChange={handleChange}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Введите описание места..."
+                disabled={isSubmitting}
               />
             </div>
 
+            {/* ✅ Фото */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Фото</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Фото {existingPhotos.length > 0 && `(${existingPhotos.length} загружено)`}
+              </label>
               <div className="flex flex-wrap gap-2">
-                {uploadedFiles.map((file, index) => (
+                {existingPhotos.map((photo, index) => (
                   <div key={index} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={photo}
+                      alt={`Фото ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+                {uploadedFiles.map((file, index) => (
+                  <div key={`new-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
                     <img
                       src={URL.createObjectURL(file)}
                       alt={file.name}
                       className="w-full h-full object-cover"
                     />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFile(index)}
-                      className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                    >
-                      ✕
-                    </button>
+                    {!isSubmitting && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(index)}
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
                 <button
                   type="button"
                   onClick={triggerFileInput}
-                  className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:border-blue-500 hover:text-blue-500 transition"
+                  disabled={isSubmitting}
+                  className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:border-blue-500 hover:text-blue-500 transition disabled:opacity-50"
                 >
                   +
                 </button>
@@ -287,15 +357,24 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 h-10 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
+                disabled={isSubmitting}
+                className="flex-1 h-10 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
                 type="submit"
-                className="flex-1 h-10 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition"
+                disabled={isSubmitting}
+                className="flex-1 h-10 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Сохранить
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  "Сохранить"
+                )}
               </button>
             </div>
           </form>
@@ -324,6 +403,13 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
         onTouchEnd={handleTouchEnd}
         onClick={(e) => e.stopPropagation()}
       >
+        {isSubmitting && (
+          <div className="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center rounded-t-2xl">
+            <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-3" />
+            <p className="text-gray-700 font-medium">Сохранение...</p>
+          </div>
+        )}
+
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
         </div>
@@ -332,7 +418,8 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
           <h2 className="text-xl font-bold text-gray-900">Редактирование места</h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition"
+            disabled={isSubmitting}
+            className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition disabled:opacity-50"
           >
             ✕
           </button>
@@ -349,6 +436,7 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                 onChange={handleChange}
                 className="w-full h-11 px-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -360,6 +448,7 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                 onChange={handleChange}
                 className="w-full h-11 px-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                disabled={isSubmitting}
               >
                 <option value="Кафе">Кафе</option>
                 <option value="Рестораны">Рестораны</option>
@@ -388,6 +477,7 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                   placeholder="Введите адрес"
                   className="w-full h-11 px-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
+                  disabled={isSubmitting}
                 />
                 {isSuggestOpen && items.length > 0 && (
                   <ul className="absolute top-full left-0 w-full z-20 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
@@ -423,11 +513,13 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                   }}
                   className="flex-1 h-11 px-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="56.8389, 60.6057"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   onClick={openMapInNewTab}
-                  className="h-11 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
+                  disabled={isSubmitting}
+                  className="h-11 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition whitespace-nowrap disabled:opacity-50"
                 >
                   На карте
                 </button>
@@ -443,32 +535,48 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Введите описание места..."
+                disabled={isSubmitting}
               />
             </div>
 
+            {/* ✅ Фото */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Фото</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Фото {existingPhotos.length > 0 && `(${existingPhotos.length} загружено)`}
+              </label>
               <div className="flex flex-wrap gap-2">
-                {uploadedFiles.map((file, index) => (
+                {existingPhotos.map((photo, index) => (
                   <div key={index} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                    <img
+                      src={photo}
+                      alt={`Фото ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+                {uploadedFiles.map((file, index) => (
+                  <div key={`new-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
                     <img
                       src={URL.createObjectURL(file)}
                       alt={file.name}
                       className="w-full h-full object-cover"
                     />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFile(index)}
-                      className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                    >
-                      ✕
-                    </button>
+                    {!isSubmitting && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(index)}
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
                 <button
                   type="button"
                   onClick={triggerFileInput}
-                  className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:border-blue-500 hover:text-blue-500 transition"
+                  disabled={isSubmitting}
+                  className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 hover:border-blue-500 hover:text-blue-500 transition disabled:opacity-50"
                 >
                   +
                 </button>
@@ -487,16 +595,24 @@ const EditPlaceModal = ({ place, isOpen, onClose, onSave }: EditPlaceModalProps)
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 h-11 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
+                disabled={isSubmitting}
+                className="flex-1 h-11 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
               >
                 Отмена
               </button>
               <button
                 type="submit"
-                onClick={handleSubmit}
-                className="flex-1 h-11 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition"
+                disabled={isSubmitting}
+                className="flex-1 h-11 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Сохранить
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  "Сохранить"
+                )}
               </button>
             </div>
           </form>

@@ -6,6 +6,7 @@ import Map from "../Map/Map";
 import AddPlaceModal from "../Map/AddPlaceModal";
 import FavoritesPanel from "../Favorites/FavoritesPanel";
 import RoutePanel from "../Route/RoutePanel";
+import Toast from "../Toast/Toast";
 import { useStore } from "../../store/useStore";
 import { categories } from "../../data/categories";
 import { placesApi } from "../../api/places";
@@ -23,22 +24,32 @@ const HomePage = () => {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isRouteOpen, setIsRouteOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const isMobile = !useMediaQuery("(min-width: 768px)");
 
   const allCategories = categories;
 
   useEffect(() => {
-    const loadPlaces = async () => {
-      try {
-        const remotePlaces = await placesApi.list({ size: 300 });
-        setPlaces(remotePlaces);
-      } catch (error) {
-        console.error("Failed to load places", error);
-      }
-    };
+  const loadPlaces = async () => {
+    try {
+      const remotePlaces = await placesApi.list({ size: 300 });
+      setPlaces(remotePlaces);
+    } catch (error) {
+      console.error("Failed to load places", error);
+    }
+  };
 
     loadPlaces();
+
+    window.showToast = (message: string, type: "success" | "error" = "success") => {
+      setToast({ message, type });
+    };
+
+    // ✅ Регистрируем центрирование карты
+    window.centerMapOnEkaterinburg = () => {
+      setMapCenter([56.8389, 60.6057]);
+    };
 
     (window as any).openAddPlaceModal = () => setIsAddModalOpen(true);
     (window as any).openFavoritesPanel = () => setIsFavoritesOpen(true);
@@ -50,6 +61,8 @@ const HomePage = () => {
       delete (window as any).openFavoritesPanel;
       delete (window as any).openRoutePanel;
       delete (window as any).toggleMobileMenu;
+      delete window.showToast;
+      delete window.centerMapOnEkaterinburg;
     };
   }, [setPlaces]);
 
@@ -220,6 +233,15 @@ const HomePage = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* ✅ Toast глобальный */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

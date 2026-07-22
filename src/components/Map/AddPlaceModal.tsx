@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/components/Map/AddPlaceModal.tsx
 import { useState, useEffect, useRef, useCallback } from "react";
 import { categories, categoryToEnumMap } from "../../data/categories";
@@ -11,6 +12,7 @@ declare global {
     isSelectingCoords?: boolean;
     setSelectedCoords?: (lat: number, lng: number) => void;
     openAddPlaceModal?: () => void;
+    showToast?: (message: string, type: "success" | "error") => void;
   }
 }
 
@@ -27,7 +29,7 @@ const AddPlaceModal = ({ isOpen, onClose }: AddPlaceModalProps) => {
     threshold: 80,
   });
 
-  const { items, isOpen: isSuggestOpen, setIsOpen: setIsSuggestOpen, fetchSuggest, clearSuggest } = useSuggest();
+  const { items, isOpen: isSuggestOpen, setIsOpen: setIsSuggestOpen, fetchSuggest, clearSuggest, fetchAddressByCoords } = useSuggest();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -61,20 +63,20 @@ const AddPlaceModal = ({ isOpen, onClose }: AddPlaceModalProps) => {
   }, [isOpen]);
 
   const handleClose = useCallback(() => {
-  setFormData({
-    name: "",
-    category: "",
-    address: "",
-    coordinates: "",
-    description: "",
-  });
-  setErrors({ name: "", category: "", address: "" });
-  setUploadedFiles([]);
-  setIsSelecting(false);
-  window.isSelectingCoords = false;
-  clearSuggest();
-  onClose();
-}, [clearSuggest, onClose]);
+    setFormData({
+      name: "",
+      category: "",
+      address: "",
+      coordinates: "",
+      description: "",
+    });
+    setErrors({ name: "", category: "", address: "" });
+    setUploadedFiles([]);
+    setIsSelecting(false);
+    window.isSelectingCoords = false;
+    clearSuggest();
+    onClose();
+  }, [clearSuggest, onClose]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,18 +89,31 @@ const AddPlaceModal = ({ isOpen, onClose }: AddPlaceModalProps) => {
   }, [isOpen, isSelecting, isSubmitting, handleClose]);
 
   useEffect(() => {
-    window.setSelectedCoords = (lat: number, lng: number) => {
+    window.setSelectedCoords = async (lat: number, lng: number) => {
       setFormData((prev) => ({
         ...prev,
         coordinates: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
       }));
+
+      try {
+        const address = await fetchAddressByCoords(lat, lng);
+        if (address) {
+          setFormData((prev) => ({
+            ...prev,
+            address: address,
+          }));
+        }
+      } catch (error) {
+        // ошибка обработана внутри хука, ничего не делаем
+      }
+
       setIsSelecting(false);
       window.isSelectingCoords = false;
     };
     return () => {
       delete window.setSelectedCoords;
     };
-  }, []);
+  }, [fetchAddressByCoords]);
 
   if (!isOpen || isSelecting) return null;
 
@@ -131,6 +146,7 @@ const AddPlaceModal = ({ isOpen, onClose }: AddPlaceModalProps) => {
       const newFiles = Array.from(e.target.files).filter((file) => {
         const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
         const maxSize = 10 * 1024 * 1024;
+
         if (!validTypes.includes(file.type)) {
           alert(`Файл "${file.name}" имеет неподдерживаемый формат. Используйте JPG, PNG или WEBP.`);
           return false;
@@ -221,11 +237,14 @@ const AddPlaceModal = ({ isOpen, onClose }: AddPlaceModalProps) => {
         throw new Error(errorData.message || "Ошибка при сохранении места");
       }
 
-      alert("Место успешно отправлено на модерацию!");
+      window.showToast?.("Место успешно отправлено на модерацию!", "success");
       handleClose();
     } catch (error) {
       console.error("Ошибка отправки формы:", error);
-      alert(error instanceof Error ? error.message : "Произошла неизвестная ошибка при загрузке");
+      window.showToast?.(
+        error instanceof Error ? error.message : "Произошла ошибка при загрузке",
+        "error"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -369,6 +388,7 @@ const AddPlaceModal = ({ isOpen, onClose }: AddPlaceModalProps) => {
               />
             </div>
 
+            {/* Фото */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Фото</label>
               <input
